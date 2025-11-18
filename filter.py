@@ -46,7 +46,7 @@ x_est = [np.array([[0], [0], [0], [0]])]
 P_est = [1000 * np.ones(4)]
 R = 0.5 #prout 
 Ts = 10 # dans le dossier général ? sinon s'accorder pour utiliser le même partout
-Q = #euh 
+Q = 0.02 #euh 
 
 while True: #faut vraiment trouver autre chose -> while state: with state=0 stop and state=1 start ?
 
