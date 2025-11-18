@@ -3,6 +3,8 @@ import numpy as np
 #do something so the program knows what Thymio class is
 #define distance_wheels but where ?
 
+state=0 #state=0 stop and state=1 start
+
 distance_wheels = 10 #in cm
 
 def get_data():
@@ -44,11 +46,11 @@ def kallman(x_est_prev, P_est_prev, v, omega, Q, Ts, pos_meas, R):     #x = [x, 
 
 x_est = [np.array([[0], [0], [0], [0]])]
 P_est = [1000 * np.ones(4)]
-R = 0.5 #prout 
+R = np.ones(2) #prout 
 Ts = 10 # dans le dossier général ? sinon s'accorder pour utiliser le même partout
-Q = 0.02 #euh 
+Q = np.ones(4)*0.5 #euh 
 
-while True: #faut vraiment trouver autre chose -> while state: with state=0 stop and state=1 start ?
+while state: #faut vraiment trouver autre chose -> while state: with state=0 stop and state=1 start ?
 
     last_pos, v, omega = get_data()
     new_x_est, new_P_est = kallman(x_est[-1], P_est[-1], v, omega, Q, Ts, last_pos, R)
