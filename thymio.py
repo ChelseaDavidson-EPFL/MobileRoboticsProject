@@ -1,3 +1,4 @@
+import asyncio
 import tdmclient.notebook
 from tdmclient import ClientAsync, aw
 import time
@@ -9,6 +10,13 @@ class Thymio :
     pos = [0, 0]
     orient = 0
     nav_mode = "GLOBAL"
+    FORWARD = 1
+    DELTA_T = 4  # seconds forward
+    SAMPLING = 0.1  # timer loop period
+
+    # Button states
+    button_forward = 0
+    button_center = 0
 
 
     # Constructor
@@ -20,6 +28,13 @@ class Thymio :
         self.nav_mode = "GLOBAL"
         self.ir_sensors = [0, 0, 0, 0, 0]
         self.motor_speeds = [0, 0]
+        self.state = 0
+        self._forward_start_time = None
+        self._timer_task = None
+
+        # Button states
+        self.button_forward = 0
+        self.button_center = 0
 
     # Methods
 
@@ -28,6 +43,10 @@ class Thymio :
         print("Thymio connected")
         await self.node.lock()
 
+    async def unlock(self):
+        if self.node is not None:
+            await self.node.unlock()
+            print("Thymio unlocked")
 
     def set_motor_speeds(self, speeds):
         
@@ -51,3 +70,61 @@ class Thymio :
     def stop(self):
         self.set_motor_speeds([0, 0])
     
+    # get method
+    def get(self, attr, default=None):
+        return getattr(self, attr, default)
+    
+
+
+    async def update_buttons(self):
+        """Read the current values of Forward and Center buttons"""
+        self.node.flush()
+        await self.node.wait_for_variables({"button.forward", "button.center"})
+
+        # Forward button
+        if "button.forward" in self.node:
+            val = self.node["button.forward"]
+            if isinstance(val, list):
+                val = val[0]
+            self.button_forward = val
+        else:
+            self.button_forward = 0
+
+        # Center button
+        if "button.center" in self.node:
+            val = self.node["button.center"]
+            if isinstance(val, list):
+                val = val[0]
+            self.button_center = val
+        else:
+            self.button_center = 0
+
+    async def button_loop(self):
+        #"""Infinite loop reacting to the button values"""
+        while True:
+            await self.update_buttons()
+
+            # Forward pressed → start moving
+            if self.button_forward and self.state != self.FORWARD:
+                print("Forward pressed")
+                self.state = self.FORWARD
+                self._forward_start_time = time.time()
+                self.set_motor_speeds([100,100])
+
+            # Center pressed → stop immediately
+            if self.button_center:
+                if self.state != 0:
+                    print("Center pressed")
+                self.state = 0
+                self._forward_start_time = None
+                self.set_motor_speeds([0,0])
+
+            # Automatically stop after DELTA_T seconds
+            if self.state == self.FORWARD:
+                elapsed = time.time() - self._forward_start_time
+                if elapsed >= self.DELTA_T:
+                    self.state = 0
+                    self._forward_start_time = None
+                    self.set_motor_speeds([0,0])
+
+            await asyncio.sleep(self.SAMPLING)

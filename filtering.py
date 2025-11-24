@@ -1,15 +1,14 @@
+from thymio import Thymio
+import numpy as np
 
-#define distance_wheels but where ?
+distance_wheels = 9.5 #in cm
+ratio_speed = 25 #data sheet: motor speed -> 500 = ~20 cm/s
 
-state=0 #state=0 stop and state=1 start
-
-distance_wheels = 10 #in cm
-
-def get_data():
-    pos = Thymio.get_pos()
-    motor_speed = Thymio.get_motor_speed()
+def get_data(thym):
+    pos = Thymio.get(thym, pos)
+    motor_speed = Thymio.get(thym, motor_speed)
     v = (motor_speed[0]+motor_speed[1])/2
-    omega = (motor_speed[0]-motor_speed[1])/distance_wheels
+    omega = (motor_speed[0]-motor_speed[1])/(ratio_speed*distance_wheels)
     return pos, v, omega
 
 def kallman(x_est_prev, P_est_prev, v, omega, Q, Ts, pos_meas, R):     #x = [x, y, theta, velocity]
@@ -41,16 +40,16 @@ def kallman(x_est_prev, P_est_prev, v, omega, Q, Ts, pos_meas, R):     #x = [x, 
     P_est = P_est_a_priori - np.dot(K, np.dot(H, P_est_a_priori))
     return x_est, P_est
 
+def use_kallman(thym, state):
+    x_est = [np.array([[0], [0], [0], [0]])]
+    P_est = [1000 * np.ones(4)]
+    R = np.ones(2) #prout
+    Ts = 10 # dans le dossier général ? sinon s'accorder pour utiliser le même partout
+    Q = np.ones(4) #prout
 
-x_est = [np.array([[0], [0], [0], [0]])]
-P_est = [1000 * np.ones(4)]
-R = np.ones(2) #prout 
-Ts = 10 # dans le dossier général ? sinon s'accorder pour utiliser le même partout
-Q = np.ones(4)*0.5 #euh 
+    while state: #faut vraiment trouver autre chose -> while state: with state=0 stop and state=1 start ?
 
-while state: #faut vraiment trouver autre chose -> while state: with state=0 stop and state=1 start ?
-
-    last_pos, v, omega = get_data()
-    new_x_est, new_P_est = kallman(x_est[-1], P_est[-1], v, omega, Q, Ts, last_pos, R)
-    x_est.append(new_x_est)
-    P_est.append(new_P_est)
+        last_pos, v, omega = get_data(thym)
+        new_x_est, new_P_est = kallman(x_est[-1], P_est[-1], v, omega, Q, Ts, last_pos, R)
+        x_est.append(new_x_est)
+        P_est.append(new_P_est)
