@@ -1,6 +1,9 @@
 import numpy as np
 import cv2
 
+MARKER_SIZE_M = 0.05   # 5 cm marker size
+
+
 # -------------------------------------------
 #        HOMOGRAPHY + GLOBAL MAPPING
 # -------------------------------------------
@@ -54,50 +57,86 @@ def getGlobalLocation(arena_corners_pixels, arena_width_m, arena_height_m,
 #        ARENA CORNER DETECTION
 # -------------------------------------------
 
-def getArenaCornerPixels(image):
+def getArenaCornerPixelsAndRealArenaSize(image, marker_size_m=MARKER_SIZE_M):
     """
-    Finds 4 red arena corner markers using HSV red thresholding.
-    Returns (bl, br, tr, tl) in pixel coordinate order.
+    Detects ArUco markers:
+        ID 1 = Bottom-left (BL)
+        ID 2 = Top-right (TR)
+
+    Returns:
+        pixel_corners = [BL, BR, TR, TL]
+        arena_width_m
+        arena_height_m
     """
 
-    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    # Dictionary for 4x4 markers
+    aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
+    detector = cv2.aruco.ArucoDetector(
+        aruco_dict,
+        cv2.aruco.DetectorParameters()
+    )
 
-    # Red thresholds
-    lower_red1 = np.array([0, 120, 70])
-    upper_red1 = np.array([10, 255, 255])
-    lower_red2 = np.array([170, 120, 70])
-    upper_red2 = np.array([180, 255, 255])
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    corners, ids, _ = detector.detectMarkers(gray)
 
-    mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
-    mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
-    mask = mask1 | mask2
-    mask = cv2.medianBlur(mask, 5)
+    if ids is None:
+        print("No ArUco markers detected")
+        return None, None, None
 
-    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    ids = ids.flatten()
 
-    red_centers = []
-    for cnt in contours:
-        area = cv2.contourArea(cnt)
-        if area > 100:  # ignore small noise
-            x, y, w, h = cv2.boundingRect(cnt)
-            cx = x + w // 2
-            cy = y + h // 2
-            red_centers.append((cx, cy))
+    # Must detect both markers
+    if not (1 in ids and 2 in ids):
+        print(f"Missing arena markers: found {ids}, expected IDs 1 and 2")
+        return None, None, None
 
-    if len(red_centers) != 4:
-        print(f"Expected 4 arena corners, but found {len(red_centers)}")
-        return [0, 0, 0, 0]
+    # ---------------------------
+    # Extract pixel centers
+    # ---------------------------
+    idx_bl = list(ids).index(1)
+    idx_tr = list(ids).index(2)
 
-    # Sort into TL, TR, BL, BR structure
-    red_centers = sorted(red_centers, key=lambda c: (c[1], c[0]))  # sort by row, then column
-    top = sorted(red_centers[:2], key=lambda c: c[0])
-    bottom = sorted(red_centers[2:], key=lambda c: c[0])
+    c_bl = corners[idx_bl][0]  # 4 corner points (TL,TR,BR,BL)
+    c_tr = corners[idx_tr][0]
 
-    tl, tr = top
-    bl, br = bottom
+    # Pixel center of BL marker
+    bl_px = (int(c_bl[:,0].mean()), int(c_bl[:,1].mean()))
+    # Pixel center of TR marker
+    tr_px = (int(c_tr[:,0].mean()), int(c_tr[:,1].mean()))
 
-    # Return in required order: bl, br, tr, tl
-    return [bl, br, tr, tl]
+    # Build rectangle:
+    x1, y1 = bl_px
+    x2, y2 = tr_px
+    br_px = (x2, y1)
+    tl_px = (x1, y2)
+
+    pixel_corners = [bl_px, br_px, tr_px, tl_px]
+
+    # ---------------------------
+    # Compute meters per pixel
+    # ---------------------------
+
+    # Marker width in pixels (use top-left -> top-right edge)
+    # For BL marker (ID 1)
+    bl_marker_width_px = np.linalg.norm(c_bl[1] - c_bl[0])  # TR - TL
+
+    if bl_marker_width_px < 1:
+        print("Invalid marker pixel width")
+        return None, None, None
+
+    meters_per_pixel = marker_size_m / bl_marker_width_px
+
+    # ---------------------------
+    # Convert arena pixel distances to meters
+    # ---------------------------
+    arena_width_pixels  = abs(x2 - x1)
+    arena_height_pixels = abs(y2 - y1)
+
+    arena_width_m  = arena_width_pixels  * meters_per_pixel
+    arena_height_m = arena_height_pixels * meters_per_pixel
+
+    return pixel_corners, arena_width_m, arena_height_m
+
 
 
 # -------------------------------------------
@@ -106,10 +145,11 @@ def getArenaCornerPixels(image):
 
 def getArucoLocationCameraFrame(cameraOrigin, image):
     """
-    Detects first ArUco marker and returns:
+    Detects ONLY ArUco marker with ID 0.
+    Returns:
     - center pixel (cx, cy)
     - heading angle in radians
-    - 4 corner points
+    - 4 corner points (TL, TR, BR, BL)
     """
 
     aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_5X5_50)
@@ -119,21 +159,31 @@ def getArucoLocationCameraFrame(cameraOrigin, image):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     corners, ids, _ = detector.detectMarkers(gray)
 
+    # No markers at all
     if ids is None:
         return 0, 0, 0, None
 
-    # Use first marker
-    c = corners[0][0]  # shape (4,2)
-    # Corner order: TL, TR, BR, BL in OpenCV ArUco
+    # Convert ids to a simple list
+    ids = ids.flatten()
+
+    # Check if ID 0 exists
+    if 0 not in ids:
+        return 0, 0, 0, None
+
+    # Find index of ID 0
+    idx = list(ids).index(0)
+
+    # Get its corners
+    c = corners[idx][0]  # shape (4,2)
     tl, tr, br, bl = c
 
-    # Compute center
+    # Center pixel of the marker
     cx = int(c[:, 0].mean())
     cy = int(c[:, 1].mean())
 
-    # Compute heading direction vector: TR - TL
+    # Heading direction vector (TR - TL)
     dir_vec = tr - tl
-    heading_angle = np.arctan2(dir_vec[1], dir_vec[0])  # radians
+    heading_angle = np.arctan2(dir_vec[1], dir_vec[0])  # in radians
 
     return cx, cy, heading_angle, c
 
@@ -143,7 +193,7 @@ def getArucoLocationCameraFrame(cameraOrigin, image):
 #          MAIN LOCALIZATION PIPELINE
 # -------------------------------------------
 
-def locateRobot(arena_width_m, arena_height_m):
+def locateRobot():
     # Capture a single frame from webcam
     cap = cv2.VideoCapture(0)
 
@@ -160,10 +210,12 @@ def locateRobot(arena_width_m, arena_height_m):
         # ----------------------------
         # 1. Detect arena corners
         # ----------------------------
-        arena_corners_pixels = getArenaCornerPixels(frame)
+        arena_corners_pixels, arena_width_m, arena_height_m = getArenaCornerPixelsAndRealArenaSize(frame)
 
-        if (arena_corners_pixels == [0,0,0,0]):
+        if (arena_corners_pixels == [0,0,0,0] or arena_width_m == None or arena_width_m == None):
             continue
+
+        print(f"Arena width: {arena_width_m:.5f} m, Arena height: {arena_width_m:.5f}")
 
         # ----------------------------
         # 2. Detect ArUco marker center
@@ -242,5 +294,5 @@ def locateRobot(arena_width_m, arena_height_m):
 
 
 if __name__ == "__main__":
-    X, Y, angle = locateRobot(0.26, 0.26)
+    X, Y, angle = locateRobot()
     print(f"Global position of the robot: X={X:.3f} m, Y={Y:.3f} m, heading={angle:.3f} degs")
