@@ -56,7 +56,7 @@ def is_robot_valid(map_grid, cx, cy, robot_h, robot_w):
 # ============================================================
 #  VISUALISATION 
 # ============================================================
-def display_map(map_grid, path, start, goal, explored):
+def display_map(map_grid, path, simplified_path, start, goal, explored):
     cmap = ListedColormap(['white', 'black', 'blue', 'green', 'red', 'grey', 'yellow'])
     map_display = np.zeros_like(map_grid, dtype=object)
 
@@ -111,6 +111,23 @@ def display_map(map_grid, path, start, goal, explored):
             alpha=0.25
         )
         ax.add_patch(rect)
+    
+    # Overlay simplified path waypoints
+    if simplified_path:
+        # Extract row and column coordinates for plotting
+        # Remember: matplotlib plot expects (x, y) where x is horizontal (column), y is vertical (row)
+        simplified_cols = [p[1] for p in simplified_path] # Column
+        simplified_rows = [p[0] for p in simplified_path] # Row
+
+        ax.plot(
+            simplified_cols,
+            simplified_rows,
+            'o',                # Marker style: circle
+            color='darkviolet', # Color of the dots
+            markersize=8,       # Size of the dots
+            markeredgecolor='black', # Outline color
+            zorder=3            # Ensure dots are on top of other elements
+        )
 
     plt.show()
 
@@ -217,13 +234,64 @@ if not is_robot_valid(Map, SearchGoal[0], SearchGoal[1], robot_h, robot_w):
     valid=False
 
 # ============================================================
+#  PATH SIMPLIFICATION into waypoints
+# ============================================================
+
+def get_direction(p1, p2):
+    """
+    Calculates the direction vector (dx, dy) between two points.
+    """
+    dx = p2[0] - p1[0] # Change in Row (Y-axis)
+    dy = p2[1] - p1[1] # Change in Column (X-axis)
+    
+    # Return the normalized direction vector (-1, 0, or 1)
+    return (np.sign(dx), np.sign(dy))
+
+def simplify_path(full_path):
+    """
+    Reduces the full cell-by-cell path to a list of corner points.
+    """
+    if not full_path or len(full_path) < 2:
+        return full_path
+
+    simplified_path = [full_path[0]] # 1. Initialize with the Start Point
+    
+    # Get the direction of the very first step
+    # Start at index 1 to look at the first full step: P[1] - P[0]
+    current_direction = get_direction(full_path[0], full_path[1]) 
+
+    # Iterate from the second point up to the second-to-last point
+    for i in range(1, len(full_path) - 1):
+        p_current = full_path[i]
+        p_next = full_path[i+1]
+        
+        # Get the direction of the next step
+        next_direction = get_direction(p_current, p_next)
+        
+        # 4. Detect Change: If the direction is different, the current point is a corner
+        if next_direction != current_direction:
+            simplified_path.append(p_current)
+            current_direction = next_direction # Update the direction for the next segment
+
+    # 5. Final Point: Always add the Goal Point
+    simplified_path.append(full_path[-1]) 
+    
+    return simplified_path
+
+# ============================================================
 #  RUN A*
 # ============================================================
 path, explored = grid_search(Map, SearchStart, SearchGoal)
 
 if path and valid:
     print("A* path length =", len(path)-1)
-    print(path)
-    display_map(Map, path, SearchStart, SearchGoal, explored)
+    print("Path =", path)
+    simplified_path = simplify_path(path)
+    
+    print("Simplified path length =", len(simplified_path)-1)
+    print("Simplified Path:", simplified_path)
+
+    display_map(Map, path, simplified_path, SearchStart, SearchGoal, explored)
+
 else:
     print("No path found.")
