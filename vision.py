@@ -229,9 +229,11 @@ def locateRobot(arena_width_m, arena_height_m):
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
 
         # Label with global coordinate
-        coord_text = f"({X:.2f}m, {Y:.2f}m)"
+        coord_text = f"({X:.5f}m, {Y:.5f}m)"
         cv2.putText(vis, coord_text, (marker_cam_x + 15, marker_cam_y),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+        print(f"Global position of the robot: X={X:.5f} m, Y={Y:.5f} m, heading={heading_deg:.5f} degs")
+        
 
         # Show the result
         cv2.imshow("Arena + Robot Position", vis)
@@ -242,5 +244,5 @@ def locateRobot(arena_width_m, arena_height_m):
 
 
 if __name__ == "__main__":
-    X, Y, angle = locateRobot(0.26, 0.26)
-    print(f"Global position of the robot: X={X:.3f} m, Y={Y:.3f} m, heading={angle:.3f} degs")
+    X, Y, angle = locateRobot(0.25, 0.25)
+    print(f"Global position of the robot: X={X:.5f} m, Y={Y:.5f} m, heading={angle:.5f} degs")
