@@ -186,8 +186,6 @@ def locateRobot(arena_width_m, arena_height_m):
             marker_cam_y
         )
 
-        print(f"Global position of the robot: X={X:.3f} m, Y={Y:.3f} m")
-
         # ----------------------------------------------------
         #           VISUALIZATION ON THE IMAGE
         # ----------------------------------------------------
@@ -240,8 +238,9 @@ def locateRobot(arena_width_m, arena_height_m):
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
-        return X, Y, heading_angle
+        return X, Y, heading_deg
 
 
 if __name__ == "__main__":
-    locateRobot(0.26, 0.26)
+    X, Y, angle = locateRobot(0.26, 0.26)
+    print(f"Global position of the robot: X={X:.3f} m, Y={Y:.3f} m, heading={angle:.3f} degs")
