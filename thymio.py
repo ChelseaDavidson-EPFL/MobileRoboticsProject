@@ -35,6 +35,7 @@ class Thymio :
         # Button states
         self.button_forward = 0
         self.button_center = 0
+        self.button_backward = 0
 
     # Methods
 
@@ -76,10 +77,10 @@ class Thymio :
     
 
 
-    async def update_buttons(self):
-        """Read the current values of Forward and Center buttons"""
+    async def update_buttons(self): # Read the current values of several buttons
+
         self.node.flush()
-        await self.node.wait_for_variables({"button.forward", "button.center"})
+        await self.node.wait_for_variables({"button.forward", "button.center", "button.backward"})
 
         # Forward button
         if "button.forward" in self.node:
@@ -98,6 +99,15 @@ class Thymio :
             self.button_center = val
         else:
             self.button_center = 0
+        
+        # Backward button
+        if "button.backward" in self.node:
+            val = self.node["button.backward"]
+            if isinstance(val, list):
+                val = val[0]
+            self.button_backward = val
+        else:
+            self.button_backward = 0
 
     async def button_loop(self):
         #"""Infinite loop reacting to the button values"""
@@ -118,6 +128,11 @@ class Thymio :
                 self.state = 0
                 self._forward_start_time = None
                 self.set_motor_speeds([0,0])
+
+            # Backward pressed → stop the loop and so this function
+            if self.button_backward:
+                print("Backward pressed")
+                break
 
             # Automatically stop after DELTA_T seconds
             if self.state == self.FORWARD:
