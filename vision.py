@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 
-MARKER_SIZE_M = 0.05   # 5 cm marker size
+MARKER_SIZE_M = 0.02  # 5 cm marker size
 
 
 # -------------------------------------------
@@ -188,12 +188,198 @@ def getArucoLocationCameraFrame(cameraOrigin, image):
     return cx, cy, heading_angle, c
 
 
+def locateObstaclesBlue(image):
+    """
+    Detect blue blobs in an image, approximate their shapes as polygons,
+    and return a list of polygons (each polygon is a list of points).
+    """
+    # Convert to HSV for easier color segmentation
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+    # Define a "blue" color range — adjust if needed
+    lower_blue = np.array([90, 60, 60])
+    upper_blue = np.array([130, 255, 255])
+
+    # Create mask for blue regions
+    mask = cv2.inRange(hsv, lower_blue, upper_blue)
+
+    # Clean the mask a bit (remove noise)
+    kernel = np.ones((5, 5), np.uint8)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+
+    # Find contours in mask
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    polygons = []
+
+    for cnt in contours:
+        # Skip tiny blobs
+        if cv2.contourArea(cnt) < 100:
+            continue
+        
+        # Approximate contour to polygon
+        epsilon = 0.02 * cv2.arcLength(cnt, True)
+        poly = cv2.approxPolyDP(cnt, epsilon, True)
+
+        # Convert Nx1x2 array to a simple list of (x, y) tuples
+        polygon_points = [(int(p[0][0]), int(p[0][1])) for p in poly]
+        polygons.append(polygon_points)
+
+    return polygons
+
+def locateObstaclesRed(image):
+    """
+    Detect red blobs in an image, approximate their shapes as polygons,
+    and return a list of polygons (each polygon is a list of (x,y) points).
+    Handles both HSV red regions (0–10° and 170–180°).
+    """
+
+    # Convert to HSV
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+    # --- Red spans the start and end of the hue circle ---
+    lower_red1 = np.array([0, 70, 50])
+    upper_red1 = np.array([10, 255, 255])
+
+    lower_red2 = np.array([170, 70, 50])
+    upper_red2 = np.array([180, 255, 255])
+
+    # Create red masks
+    mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
+    mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
+    mask = cv2.bitwise_or(mask1, mask2)
+
+    # Remove noise
+    kernel = np.ones((5, 5), np.uint8)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+
+    # Find contours
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    polygons = []
+
+    for cnt in contours:
+        # Filter out small artifacts
+        if cv2.contourArea(cnt) < 100:
+            continue
+
+        # Approximate to polygon
+        epsilon = 0.02 * cv2.arcLength(cnt, True)
+        poly = cv2.approxPolyDP(cnt, epsilon, True)
+
+        # Convert polygon format for output
+        polygon_points = [(int(p[0][0]), int(p[0][1])) for p in poly]
+        polygons.append(polygon_points)
+
+    return polygons
+
+def locateObstaclesGreen(image):
+    """
+    Detect green blobs in an image, approximate their shapes as polygons,
+    and return a list of polygons (each polygon is a list of points).
+    """
+    # Convert to HSV for easier color segmentation
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+    # Define green HSV range (adjust if needed)
+    lower_green = np.array([35, 60, 60])
+    upper_green = np.array([85, 255, 255])
+
+    # Create mask for green regions
+    mask = cv2.inRange(hsv, lower_green, upper_green)
+
+    # Clean the mask to remove noise
+    kernel = np.ones((5, 5), np.uint8)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+
+    # Find contours in the mask
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    polygons = []
+
+    for cnt in contours:
+        # Skip tiny shapes
+        if cv2.contourArea(cnt) < 100:
+            continue
+        
+        # Approximate contour as polygon
+        epsilon = 0.02 * cv2.arcLength(cnt, True)
+        poly = cv2.approxPolyDP(cnt, epsilon, True)
+
+        # Convert Nx1x2 array to list of (x, y) tuples
+        polygon_points = [(int(p[0][0]), int(p[0][1])) for p in poly]
+        polygons.append(polygon_points)
+
+    return polygons
+
+def locateObstaclesBlack(image):
+    """
+    Detect black blobs in an image, approximate their shapes as polygons,
+    and return a list of polygons (each polygon is a list of points).
+    Only returns shapes that are uniformly dark inside (to avoid detecting ArUco tags).
+    """
+    # Convert to HSV for robust color thresholding
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    # cv2.imshow("HSV image", hsv)
+
+    # Black has low value (V); hue & saturation don't matter
+    # Adjust the upper V limit based on lighting (40–60 = typical)
+    lower_black = np.array([0, 0, 0])
+    upper_black = np.array([180, 255, 40])
+
+    # Create mask for dark regions
+    mask = cv2.inRange(hsv, lower_black, upper_black)
+
+    # Clean noise
+    kernel = np.ones((5, 5), np.uint8)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+
+    # Find contours
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    polygons = []
+
+    for cnt in contours:
+
+        # Skip tiny bits of noise
+        if cv2.contourArea(cnt) < 300:
+            continue
+
+        # Approximate contour to polygon
+        epsilon = 0.02 * cv2.arcLength(cnt, True)
+        poly = cv2.approxPolyDP(cnt, epsilon, True)
+
+        # ---- FULL-BLACK CONSISTENCY CHECK ----
+        # Create a mask of this contour only
+        contour_mask = np.zeros(mask.shape, dtype=np.uint8)
+        cv2.drawContours(contour_mask, [cnt], -1, 255, -1)
+
+        # Extract pixels inside contour
+        inside = hsv[contour_mask == 255][:, 2]  # extract V channel
+
+        # Fraction of truly dark pixels inside the shape
+        # You can tune the threshold; 0.90–0.98 works well
+        dark_fraction = np.mean(inside < 60)
+
+        # Reject shapes that aren't uniformly black (e.g., ArUco tags)
+        if dark_fraction < 0.80:
+            continue
+
+        # Convert Nx1x2 array to a list of (x, y) tuples
+        polygon_points = [(int(p[0][0]), int(p[0][1])) for p in poly]
+        polygons.append(polygon_points)
+
+    return polygons
 
 # -------------------------------------------
 #          MAIN LOCALIZATION PIPELINE
 # -------------------------------------------
 
-def locateRobot():
+def locateRobotAndObstacles():
     # Capture a single frame from webcam
     cap = cv2.VideoCapture(0)
 
@@ -201,11 +387,17 @@ def locateRobot():
         print("Error: Could not access the webcam.")
         exit()
 
+    waitNumber = 30
+    waitIndx = 0
     while True:
         ret, frame = cap.read()
         if not ret:
             print("Camera failed to capture the frame.")
             break
+
+        waitIndx += 1
+        if (waitIndx < waitNumber):
+            continue
 
         # ----------------------------
         # 1. Detect arena corners
@@ -237,6 +429,11 @@ def locateRobot():
             marker_cam_x,
             marker_cam_y
         )
+
+        # ----------------------------
+        # 4. Find obstacles
+        # ----------------------------
+        polygons = locateObstaclesRed(frame)
 
         # ----------------------------------------------------
         #           VISUALIZATION ON THE IMAGE
@@ -284,15 +481,20 @@ def locateRobot():
         coord_text = f"({X:.2f}m, {Y:.2f}m)"
         cv2.putText(vis, coord_text, (marker_cam_x + 15, marker_cam_y),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+        
+        # Outline obstacles
+        for poly in polygons:
+            pts = np.array(poly, dtype=np.int32)
+            cv2.polylines(vis, [pts], isClosed=True, color=(0, 0, 255), thickness=2)
 
         # Show the result
         cv2.imshow("Arena + Robot Position", vis)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
-        return X, Y, heading_deg
+        return X, Y, heading_deg, polygons
 
 
 if __name__ == "__main__":
-    X, Y, angle = locateRobot()
+    X, Y, angle, obstacles = locateRobotAndObstacles()
     print(f"Global position of the robot: X={X:.3f} m, Y={Y:.3f} m, heading={angle:.3f} degs")
