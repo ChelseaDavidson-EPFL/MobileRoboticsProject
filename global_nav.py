@@ -204,8 +204,8 @@ Map[15, 20:26] = -1
 Map[25, 25] = 2
 
 # Start & Goal
-SearchStart = (40, 10)
-SearchGoal = (5, 40)
+SearchStart = (2, 12)
+SearchGoal = (45, 35)
 
 # Validate robot positions
 if not is_robot_valid(Map, SearchStart[0], SearchStart[1], robot_h, robot_w):
