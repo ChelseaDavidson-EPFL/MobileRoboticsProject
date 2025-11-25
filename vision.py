@@ -106,8 +106,10 @@ def getArenaCornerPixels(image):
 
 def getArucoLocationCameraFrame(cameraOrigin, image):
     """
-    Detects an ArUco marker and returns its (u,v) pixel coordinates.
-    cameraOrigin is unused but kept for compatibility.
+    Detects first ArUco marker and returns:
+    - center pixel (cx, cy)
+    - heading angle in radians
+    - 4 corner points
     """
 
     aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_5X5_50)
@@ -118,15 +120,23 @@ def getArucoLocationCameraFrame(cameraOrigin, image):
     corners, ids, _ = detector.detectMarkers(gray)
 
     if ids is None:
-        print("No ArUco marker detected")
-        return 0, 0
+        return 0, 0, 0, None
 
-    # Use the first marker seen
-    c = corners[0][0]
+    # Use first marker
+    c = corners[0][0]  # shape (4,2)
+    # Corner order: TL, TR, BR, BL in OpenCV ArUco
+    tl, tr, br, bl = c
+
+    # Compute center
     cx = int(c[:, 0].mean())
     cy = int(c[:, 1].mean())
 
-    return cx, cy
+    # Compute heading direction vector: TR - TL
+    dir_vec = tr - tl
+    heading_angle = np.arctan2(dir_vec[1], dir_vec[0])  # radians
+
+    return cx, cy, heading_angle, c
+
 
 
 # -------------------------------------------
@@ -158,9 +168,9 @@ def locateRobot(arena_width_m, arena_height_m):
         # ----------------------------
         # 2. Detect ArUco marker center
         # ----------------------------
-        marker_cam_x, marker_cam_y = getArucoLocationCameraFrame(arena_corners_pixels[0], frame)
+        marker_cam_x, marker_cam_y, heading_angle, marker_corners = getArucoLocationCameraFrame(arena_corners_pixels[0], frame)
 
-        if (marker_cam_x == 0 and marker_cam_y == 0):
+        if marker_corners is None:
             continue
 
 
@@ -193,8 +203,32 @@ def locateRobot(arena_width_m, arena_height_m):
             cv2.putText(vis, name, (x + 5, y - 5),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
-        # Draw ArUco marker location (red)
-        cv2.circle(vis, (marker_cam_x, marker_cam_y), 8, (0, 0, 255), -1)
+        # Draw ArUco marker location
+        int_corners = marker_corners.astype(np.int32)
+        cv2.polylines(vis, [int_corners], True, (255, 0, 0), 3)
+
+        # Draw center point
+        cv2.circle(vis, (marker_cam_x, marker_cam_y), 6, (0, 0, 255), -1)
+
+        # Draw heading vector (scaled)
+        arrow_len = 50
+        dx = int(np.cos(heading_angle) * arrow_len)
+        dy = int(np.sin(heading_angle) * arrow_len)
+
+        cv2.arrowedLine(
+            vis,
+            (marker_cam_x, marker_cam_y),
+            (marker_cam_x + dx, marker_cam_y + dy),
+            (0, 255, 255),
+            3,
+            tipLength=0.3
+        )
+
+        # Display heading in degrees
+        heading_deg = np.degrees(heading_angle) * -1
+        cv2.putText(vis, f"Heading: {heading_deg:.1f} deg",
+                    (marker_cam_x + 20, marker_cam_y - 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
 
         # Label with global coordinate
         coord_text = f"({X:.2f}m, {Y:.2f}m)"
@@ -206,7 +240,7 @@ def locateRobot(arena_width_m, arena_height_m):
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
-        return X, Y
+        return X, Y, heading_angle
 
 
 if __name__ == "__main__":
