@@ -243,6 +243,6 @@ def locateRobot(arena_width_m, arena_height_m):
         return X, Y, heading_deg
 
 
-if __name__ == "__main__":
-    X, Y, angle = locateRobot(0.25, 0.25)
-    print(f"Global position of the robot: X={X:.5f} m, Y={Y:.5f} m, heading={angle:.5f} degs")
+#if __name__ == "__main__":
+#    X, Y, angle = locateRobot(0.25, 0.25)
+#    print(f"Global position of the robot: X={X:.5f} m, Y={Y:.5f} m, heading={angle:.5f} degs")
