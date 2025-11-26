@@ -1,8 +1,7 @@
 from thymio import Thymio
 import numpy as np
 
-distance_wheels = 9.5 #in cm
-ratio_speed = 25 #data sheet: motor speed -> 500 = ~20 cm/s
+distance_wheels = 95 #in mm
 
 def filter_pos(thym: Thymio, pos_on_img, orient_on_img):
     thym.pos = pos_on_img
@@ -11,6 +10,7 @@ def filter_pos(thym: Thymio, pos_on_img, orient_on_img):
     
 
 def get_data(thym):
+def get_data(thym, ratio_speed):
     pos = Thymio.get(thym, pos)
     motor_speed = Thymio.get(thym, motor_speed)
     v = (motor_speed[0]+motor_speed[1])/2
@@ -46,7 +46,7 @@ def kallman(x_est_prev, P_est_prev, v, omega, Q, Ts, pos_meas, R):     #x = [x, 
     P_est = P_est_a_priori - np.dot(K, np.dot(H, P_est_a_priori))
     return x_est, P_est
 
-def use_kallman(thym, state):
+def use_kallman(thym, state, ratio_speed):
     x_est = [np.array([[0], [0], [0], [0]])]
     P_est = [1000 * np.ones(4)]
     R = np.ones(2) #prout
@@ -55,7 +55,7 @@ def use_kallman(thym, state):
 
     while state: #faut vraiment trouver autre chose -> while state: with state=0 stop and state=1 start ?
 
-        last_pos, v, omega = get_data(thym)
+        last_pos, v, omega = get_data(thym, ratio_speed)
         new_x_est, new_P_est = kallman(x_est[-1], P_est[-1], v, omega, Q, Ts, last_pos, R)
         x_est.append(new_x_est)
         P_est.append(new_P_est)
