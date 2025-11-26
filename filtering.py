@@ -4,6 +4,12 @@ import numpy as np
 distance_wheels = 9.5 #in cm
 ratio_speed = 25 #data sheet: motor speed -> 500 = ~20 cm/s
 
+def filter_pos(thym: Thymio, pos_on_img, orient_on_img):
+    thym.pos = pos_on_img
+    thym.orient = orient_on_img
+    return 
+    
+
 def get_data(thym):
     pos = Thymio.get(thym, pos)
     motor_speed = Thymio.get(thym, motor_speed)
