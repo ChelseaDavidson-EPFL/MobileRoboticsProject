@@ -5,6 +5,12 @@ import cv2
 Setup notes:
 - ID 1 must go bottom left
 - ID 2 must go top right
+
+Potential TODOs:
+- Do we want getEnvironment to be called upon initialisation?
+- Do we want getEnvironment and getRobotPoseAndVisualise to call use the same image capture to save time?
+- Are we okay with heading angle being [-pi, pi] or do we want it to be [0, 2pi]?
+- Need to confirm that the real world locations are accurate, especially for the obstacle polygons 
 """
 
 class Vision:
