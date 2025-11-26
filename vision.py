@@ -87,8 +87,6 @@ class Vision:
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
-
-
     def createGrid(self, robot_x, robot_y, arena_w, arena_h, obstacle_polygons):
         """
         Creates a grid in world frame coordinates where the bottom left corner of the arena is 0,0 so the top right corner 
@@ -96,6 +94,8 @@ class Vision:
         """
         self.grid = None # TODO
 
+    def getGrid(self):
+        return self.grid
 
     def getArenaCornerPixelsAndRealArenaSize(self, image):
         """
@@ -173,18 +173,22 @@ class Vision:
         # Get robot pose in camera frame
         robot_cam_x, robot_cam_y, robot_heading_angle, robot_marker_corners = self.getRobotPoseCameraFrame(image)
 
+        if (robot_cam_x is None or robot_cam_y is None or robot_heading_angle is None or robot_marker_corners is None):
+            print("Couldn't locate robot so exiting getRobotPose function")
+            return None, None, None
+
         # Convert to global coordinates
         X, Y = self.getGlobalLocation(robot_cam_x, robot_cam_y)
 
-        return X, Y, robot_heading_angle # TODO - IDk if heading angle is correct
+        return X, Y, robot_heading_angle
     
     def getRobotPoseAndVisualise(self, image, vis):
         # Get robot pose in camera frame
         robot_cam_x, robot_cam_y, robot_heading_angle, robot_marker_corners = self.getRobotPoseCameraFrame(image)
 
         if (robot_cam_x is None or robot_cam_y is None or robot_heading_angle is None or robot_marker_corners is None):
-            print("Couldn't locate robot so exiting getPoseAndVisualise function")
-            return
+            print("Couldn't locate robot so exiting geRobottPoseAndVisualise function")
+            return None, None, None
 
         # Convert to global coordinates
         X, Y = self.getGlobalLocation(robot_cam_x, robot_cam_y)
@@ -192,7 +196,7 @@ class Vision:
         # Visualise
         self.visualiseRobotPose(vis, robot_marker_corners, robot_cam_x, robot_cam_y, robot_heading_angle, X, Y)
 
-        return X, Y, robot_heading_angle # TODO - IDk if heading angle is correct
+        return X, Y, robot_heading_angle
 
         
     def getRobotPoseCameraFrame(self, image):
@@ -236,9 +240,9 @@ class Vision:
 
         # Heading direction vector (TR - TL)
         dir_vec = tr - tl
-        heading_angle = np.arctan2(dir_vec[1], dir_vec[0])  # in radians
+        heading_angle = np.arctan2(-dir_vec[1], dir_vec[0])  # (radians) NOTE: do negative of y since camera y is top bottom not bottom top 
 
-        return cx, cy, heading_angle, robotCorners #TODO - Idk if heading angle is going to be correct
+        return cx, cy, heading_angle, robotCorners
 
     def computeHomography(self, arena_corners_pixels, arena_width_m, arena_height_m):
         """
@@ -369,8 +373,9 @@ class Vision:
 
         # Draw heading vector (scaled)
         arrow_len = 50
-        dx = int(np.cos(robot_heading_angle) * arrow_len)
-        dy = int(np.sin(robot_heading_angle) * arrow_len)
+        # NOTE: Need to visualise the negative of the angle since camera y direction is top bottom not bottom top
+        dx = int(np.cos(-robot_heading_angle) * arrow_len)
+        dy = int(np.sin(-robot_heading_angle) * arrow_len)
 
         cv2.arrowedLine(
             vis,
@@ -382,7 +387,7 @@ class Vision:
         )
 
         # Display heading in degrees
-        heading_deg = np.degrees(robot_heading_angle) * -1 #TODO - Add this to the original one and multiply by -1 when doing the drawing since that's in robot frame
+        heading_deg = np.degrees(robot_heading_angle)
         cv2.putText(vis, f"Heading: {heading_deg:.1f} deg",
                     (robot_center_cam_x + 20, robot_center_cam_y - 20),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
@@ -425,7 +430,10 @@ if __name__ == "__main__":
         visionInstance.visualiseArena(vis, visionInstance.arena_corners_pixels)
 
         # --- Always detect and draw robot pose ---
-        visionInstance.getRobotPoseAndVisualise(frame, vis)
+        X, Y, robot_heading_angle = visionInstance.getRobotPoseAndVisualise(frame, vis)
+        if (X is None or Y is None or robot_heading_angle is None):
+            continue
+        print(f"X: {X:.5f}, Y: {Y:.5f}, Direction: {robot_heading_angle:.5f}")
 
         # --- Show the live window ---
         cv2.imshow("Live Robot Pose", vis)
