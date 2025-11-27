@@ -3,6 +3,18 @@ import numpy as np
 
 DISTANCE_WHEELS = 95 #in mm
 
+def filter_pos(thym: Thymio, pos_on_img, orient_on_img):
+    thym.pos = pos_on_img
+    thym.orient = orient_on_img
+    return 
+    
+
+def get_data(thym, ratio_speed):
+    pos = Thymio.get(thym, pos)
+    motor_speed = Thymio.get(thym, motor_speed)
+    v = (motor_speed[0]+motor_speed[1])/2
+    omega = (motor_speed[0]-motor_speed[1])/(ratio_speed*distance_wheels)
+    return pos, v, omega
 
 def kallman(x_est_prev, P_est_prev, v, omega, Q, Ts, pos_meas, R):     #x = [x, y, theta, velocity]
     x_next = x_est_prev[0]+v*np.cos(x_est_prev[2])*Ts
