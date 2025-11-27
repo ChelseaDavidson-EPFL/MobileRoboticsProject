@@ -4,12 +4,6 @@ from matplotlib.colors import ListedColormap
 from matplotlib.path import Path # Used for robust grid creation
 from heapq import heappush, heappop
 
-# ============================================================
-#  CONSTANTS
-# ============================================================
-# Robot footprint (width × height), centered on the path cell
-robot_w = 22
-robot_h = 22
 
 # Grid resolution is 200x200 (1m / 0.005m)
 GRID_DIM = 200
@@ -34,12 +28,13 @@ def real_to_grid(coord):
 def grid_to_real(coord):
     return (coord[1]/2, 100-coord[0]/2)
 
+# ============================================================
+#  CONSTANTS
+# ============================================================
+# Robot footprint (width × height), centered on the path cell
+robot_w = cm_to_cell(2)
+robot_h = cm_to_cell(2)
 
-# ============================================================
-#  PATH FINDEER (returns path that the robot has to take)
-# ============================================================
-def find_path():
-    return [[0,0],[0,0],[0,0]]
 
 # ============================================================
 #  HEURISTIC (Octile Distance)
@@ -90,7 +85,7 @@ def is_robot_valid(map_grid, cx, cy, robot_h, robot_w):
 # ============================================================
 #  VISUALISATION 
 # ============================================================
-def display_map(map_grid, path, simplified_path, start, goal, explored):
+def display_map(map_grid, path, simplified_path, start, goal):
     # Define colors for the grid
     cmap = ListedColormap(['white', 'black', 'blue', 'green', 'red'])
     map_display = np.zeros_like(map_grid, dtype=object)
@@ -148,8 +143,8 @@ def display_map(map_grid, path, simplified_path, start, goal, explored):
         ax.add_patch(rect)
 
     # Start and Goal    
-    ax.scatter(SearchStart[0], SearchStart[1], s=300, c="blue")
-    ax.scatter(SearchGoal[0], SearchGoal[1], s=300, c="green")
+    ax.scatter(start[0], start[1], s=300, c="blue")
+    ax.scatter(goal[0], goal[1], s=300, c="green")
     
     # Overlay simplified path waypoints
     if simplified_path:
@@ -213,9 +208,9 @@ def display_grid(map_grid):
     plt.show()
 
 # ============================================================
-#  A* SEARCH
+#  PATH FINDEER (returns path that the robot has to take)
 # ============================================================
-def grid_search(map_grid, S, G):
+def find_path(map_grid, S, G):
     """Finds the shortest path using A* with 8-connectivity and robot collision checking."""
     
     came_from = {}
@@ -276,9 +271,9 @@ def grid_search(map_grid, S, G):
             current_pos = came_from[current_pos]
         path.append(S)
         path.reverse()
-        return path, explored
+        return path
 
-    return None, explored
+    return None
 
 # ============================================================
 #  OCCUPANCY GRID CREATION - Now in vision

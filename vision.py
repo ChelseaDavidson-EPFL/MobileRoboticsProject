@@ -38,7 +38,7 @@ class Vision:
 
     def getEnvironment(self):
          # Capture a single frame from webcam
-        self.cap = cv2.VideoCapture(0)
+        self.cap = cv2.VideoCapture(1) # 1 for Arthur, 0 for Chelsea
 
         if not self.cap.isOpened():
             print("Error: Could not access the webcam.")
@@ -50,7 +50,7 @@ class Vision:
             ret, frame = self.cap.read()
             if not ret:
                 print("Camera failed to capture the frame.")
-                break
+                exit()
 
             vis = frame.copy()
 
@@ -83,7 +83,7 @@ class Vision:
             # ----------------------------
             polygons = self.locateObstaclesRed(frame)
             global_polygons = self.convertPolygonsToWorld(polygons)
-
+            
             # ----------------------------
             # 5. Create and store occupancy grid
             # ----------------------------
@@ -110,7 +110,7 @@ class Vision:
         will be arena_w, arena_h. Both the robot position and obstacle_polygons are relative to this 0,0 frame. The grid has (0=free, -1=obstacle) using matplotlib.path.Path.
         """
         self.cell_size_cm = (arena_w/self.grid_dim)*100 
-        cell_size_m = self.cell_size_cm*100
+        cell_size_m = self.cell_size_cm/100
         grid = np.zeros((self.grid_dim, self.grid_dim), dtype=np.int8) # Use -1 for obstacles
 
         # Create a meshgrid of all cell centers in meters
@@ -174,7 +174,7 @@ class Vision:
         y_positions = np.arange(0, 201, 20)
 
         # Convert cell index → centimeters (1 cell = 2 cm)
-        (x_labels,y_labels)=self.grid_to_real((x_positions,y_positions))
+        x_labels,y_labels=self.grid_to_real((x_positions,y_positions))
         plt.xticks(x_positions, x_labels)
         plt.yticks(y_positions, y_labels)
         ax.set_xlabel('X Dimension (cm)')
@@ -408,8 +408,12 @@ class Vision:
             world_poly = []
             for (u, v) in poly:
                 X, Y = self.pixelToGlobal(H, (u, v))
-                world_poly.append((X, Y))
-            world_polygons.append(world_poly)
+                world_poly.append([X, Y])
+
+            # Convert each polygon separately → (N,1,2)
+            poly_np = np.array(world_poly, dtype=np.float32).reshape(-1, 1, 2)
+            world_polygons.append(poly_np)
+
 
         return world_polygons
 
@@ -515,40 +519,37 @@ class Vision:
 
 if __name__ == "__main__":
     visionInstance = Vision()
-
-    # Get the initial environment and saves it to class variables (detect arena, compute homography, get obstacles)
-    visionInstance.getEnvironment()
+    visionInstance.display_grid()
 
     # Now start the live robot pose visualisation
-    cap = cv2.VideoCapture(0)
+    
+    # if not cap.isOpened():
+    #     print("Error: Could not access the webcam.")
+    #     exit()
 
-    if not cap.isOpened():
-        print("Error: Could not access the webcam.")
-        exit()
+    # while True:
+    #     ret, frame = cap.read()
+    #     if not ret:
+    #         print("Camera failed to capture the frame.")
+    #         break
 
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            print("Camera failed to capture the frame.")
-            break
+    #     vis = frame.copy()
 
-        vis = frame.copy()
+    #     # --- Always redraw arena outline ---
+    #     visionInstance.visualiseArena(vis, visionInstance.arena_corners_pixels)
 
-        # --- Always redraw arena outline ---
-        visionInstance.visualiseArena(vis, visionInstance.arena_corners_pixels)
+    #     # --- Always detect and draw robot pose ---
+    #     [X, Y], robot_heading_angle = visionInstance.getRobotPoseAndVisualise(frame, vis)
+    #     if (X is None or Y is None or robot_heading_angle is None):
+    #         continue
+    #     print(f"X: {X:.5f}, Y: {Y:.5f}, Direction: {robot_heading_angle:.5f}")
 
-        # --- Always detect and draw robot pose ---
-        [X, Y], robot_heading_angle = visionInstance.getRobotPoseAndVisualise(frame, vis)
-        if (X is None or Y is None or robot_heading_angle is None):
-            continue
-        print(f"X: {X:.5f}, Y: {Y:.5f}, Direction: {robot_heading_angle:.5f}")
+    #     # --- Show the live window ---
+    #     cv2.imshow("Live Robot Pose", vis)
 
-        # --- Show the live window ---
-        cv2.imshow("Live Robot Pose", vis)
+    #     # Exit on Q
+    #     if cv2.waitKey(1) & 0xFF == ord('q'):
+    #         break
 
-        # Exit on Q
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-
-    cap.release()
-    cv2.destroyAllWindows()
+    # cap.release()
+    # cv2.destroyAllWindows()
