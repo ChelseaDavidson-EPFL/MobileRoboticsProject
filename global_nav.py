@@ -190,9 +190,8 @@ def display_grid(map_grid):
     y_positions = np.arange(0, 201, 20)
 
     # Convert cell index → centimeters (1 cell = 2 cm)
-    x_labels = x_positions / 2
-    y_labels = (200 - y_positions) / 2  # if you want top=100 cm and bottom=0 cm
-
+    x_labels, y_labels = cell_to_cm((x_positions, y_positions))
+    
     plt.xticks(x_positions, x_labels)
     plt.yticks(y_positions, y_labels)
     ax.set_xlabel('X Dimension (cm)')
