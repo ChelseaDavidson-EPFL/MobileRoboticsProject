@@ -13,8 +13,9 @@ robot_h = 22
 
 # Grid resolution is 200x200 (1m / 0.005m)
 GRID_DIM = 200
-CELL_SIZE_CM = 0.5
 ARENA_SIZE_CM = 100
+CELL_SIZE_CM = ARENA_SIZE_CM / GRID_DIM  
+
 
 # ============================================================
 #  AXIS CONVERSION FUNCTIONS
@@ -29,10 +30,10 @@ def cm_to_cell(cm_value):
     return cm_value / CELL_SIZE_CM
 
 def real_to_grid(coord):
-    return (coord[1]*2, 200-coord[0]*2)
+    return (coord[1]/CELL_SIZE_CM, GRID_DIM-coord[0]/CELL_SIZE_CM)
 
 def grid_to_real(coord):
-    return (coord[1]/2, 100-coord[0]/2)
+    return (coord[1]*CELL_SIZE_CM, ARENA_SIZE_CM-coord[0]*CELL_SIZE_CM)
 
 # ============================================================
 #  HEURISTIC (Octile Distance)
@@ -190,8 +191,8 @@ def display_grid(map_grid):
     y_positions = np.arange(0, 201, 20)
 
     # Convert cell index → centimeters (1 cell = 2 cm)
-    x_labels, y_labels = cell_to_cm((x_positions, y_positions))
-    
+    x_labels, y_labels = x_labels, y_labels = grid_to_real((np.arange(0, 201, 20), np.arange(0, 201, 20)))
+
     plt.xticks(x_positions, x_labels)
     plt.yticks(y_positions, y_labels)
     ax.set_xlabel('X Dimension (cm)')
@@ -392,7 +393,7 @@ print("SearchGoal (grid):", SearchGoal)
 # 1. Create the Occupancy Map
 # Grid cells: 0 = Free, -1 = Obstacle
 Map = create_occupancy_grid(obstacles_list)
-
+display_grid(Map)
 # 2. Run the A* Search
 path, explored = grid_search(Map, SearchStart, SearchGoal)
 
