@@ -281,46 +281,9 @@ def grid_search(map_grid, S, G):
     return None, explored
 
 # ============================================================
-#  OCCUPANCY GRID CREATION
+#  OCCUPANCY GRID CREATION - Now in vision
 # ============================================================
 
-def create_occupancy_grid(obstacles, grid_dim=GRID_DIM, cell_size_m=CELL_SIZE_CM/100, arena_size_m=ARENA_SIZE_CM/100):
-    """
-    Creates an occupancy grid (0=free, -1=obstacle) using matplotlib.path.Path.
-    """
-    grid = np.zeros((grid_dim, grid_dim), dtype=np.int8) # Use -1 for obstacles
-
-    # Create a meshgrid of all cell centers in meters
-    x_coords = np.linspace(0.5 * cell_size_m, arena_size_m - 0.5 * cell_size_m, grid_dim)
-    y_coords = np.linspace(0.5 * cell_size_m, arena_size_m - 0.5 * cell_size_m, grid_dim)
-    
-    # Array of all (x, y) points corresponding to cell centers
-    X, Y = np.meshgrid(x_coords, y_coords)
-    points = np.vstack((X.flatten(), Y.flatten())).T
-
-    occupied_indices = np.zeros(grid_dim * grid_dim, dtype=bool)
-
-    for polygon in obstacles:
-        # Reshape polygon vertices to (N, 2)
-        verts = polygon.reshape(-1, 2)
-        
-        # Create a Path object from the polygon vertices
-        poly_path = Path(verts)
-        
-        # Check which cell centers are contained within the polygon
-        contained = poly_path.contains_points(points, radius=0)
-        
-        # Combine the results for all polygons (logical OR)
-        occupied_indices = occupied_indices | contained
-
-    # Map Occupancy back to the 2D Grid
-    # True -> -1 (Obstacle), False -> 0 (Free)
-    grid_flat = occupied_indices.astype(np.int8) * -1
-    occupancy_grid = grid_flat.reshape(grid_dim, grid_dim)
-
-    occupancy_grid = np.flipud(occupancy_grid)
-    
-    return occupancy_grid
 
 # ============================================================
 #  PATH SIMPLIFICATION into waypoints
@@ -359,67 +322,67 @@ def simplify_path(full_path):
 #  EXECUTION BLOCK
 # ============================================================
 
-# Define example obstacles in meters (mimicking cv2.approxPolyDP output)
-# 1. Large Triangle (Vertices in meters)
-poly1_m_rand = np.array([
-    [[0.40, 0.20]],
-    [[0.60, 0.45]],
-    [[0.35, 0.70]]
-], dtype=np.float32)
+# # Define example obstacles in meters (mimicking cv2.approxPolyDP output)
+# # 1. Large Triangle (Vertices in meters)
+# poly1_m_rand = np.array([
+#     [[0.40, 0.20]],
+#     [[0.60, 0.45]],
+#     [[0.35, 0.70]]
+# ], dtype=np.float32)
 
-# 2. Inverted L-Shape (Vertices in meters)
-poly2_m_rand = np.array([
-    [[0.75, 0.65]],
-    [[0.90, 0.65]],
-    [[0.90, 0.90]],
-    [[0.65, 0.90]],
-    [[0.65, 0.80]],
-    [[0.75, 0.80]]
-], dtype=np.float32)
+# # 2. Inverted L-Shape (Vertices in meters)
+# poly2_m_rand = np.array([
+#     [[0.75, 0.65]],
+#     [[0.90, 0.65]],
+#     [[0.90, 0.90]],
+#     [[0.65, 0.90]],
+#     [[0.65, 0.80]],
+#     [[0.75, 0.80]]
+# ], dtype=np.float32)
 
-# 3. Narrow Rectangle (Vertices in meters)
-poly3_m_rand = np.array([
-    [[0.10, 0.85]],
-    [[0.20, 0.85]],
-    [[0.20, 0.95]],
-    [[0.10, 0.95]]
-], dtype=np.float32)
+# # 3. Narrow Rectangle (Vertices in meters)
+# poly3_m_rand = np.array([
+#     [[0.10, 0.85]],
+#     [[0.20, 0.85]],
+#     [[0.20, 0.95]],
+#     [[0.10, 0.95]]
+# ], dtype=np.float32)
 
-obstacles_list = [poly1_m_rand, poly3_m_rand]
+# obstacles_list = [poly1_m_rand, poly3_m_rand]
 
-# Example Search Parameters (Row, Column)
-# (10, 10) is near the bottom-left corner
-SearchStart_real = (20, 20) 
-SearchStart = real_to_grid(SearchStart_real)
-print("SearchStart (grid):", SearchStart)
-# (180, 180) is near the top-right corner
-SearchGoal_real = (80, 80)
-SearchGoal = real_to_grid(SearchGoal_real)
-print("SearchGoal (grid):", SearchGoal)
+# # Example Search Parameters (Row, Column)
+# # (10, 10) is near the bottom-left corner
+# SearchStart_real = (20, 20) 
+# SearchStart = real_to_grid(SearchStart_real)
+# print("SearchStart (grid):", SearchStart)
+# # (180, 180) is near the top-right corner
+# SearchGoal_real = (80, 80)
+# SearchGoal = real_to_grid(SearchGoal_real)
+# print("SearchGoal (grid):", SearchGoal)
 
-# 1. Create the Occupancy Map
-# Grid cells: 0 = Free, -1 = Obstacle
-Map = create_occupancy_grid(obstacles_list)
+# # 1. Create the Occupancy Map
+# # Grid cells: 0 = Free, -1 = Obstacle
+# Map = create_occupancy_grid(obstacles_list)
 
-# 2. Run the A* Search
-path, explored = grid_search(Map, SearchStart, SearchGoal)
+# # 2. Run the A* Search
+# path, explored = grid_search(Map, SearchStart, SearchGoal)
 
-# 3. Process and Display Results
-if path:
-    simplified_path = simplify_path(path)
+# # 3. Process and Display Results
+# if path:
+#     simplified_path = simplify_path(path)
     
-    print("--- A* Pathfinding Results ---")
-    print(f"Robot Size: {robot_h}x{robot_w} cells")
-    print(f"Start: {SearchStart}, Goal: {SearchGoal}")
-    print(f"Total cells explored: {len(explored)}")
-    print(f"Full Path Length (cells): {len(path)-1}")
-    print(f"Simplified Path Waypoints: {len(simplified_path)}")
-    print(simplified_path)
-    converted_simplified_path = [grid_to_real(p) for p in simplified_path]
-    print("Simplified Path Waypoints (real cm):", converted_simplified_path)
-    print("------------------------------")
+#     print("--- A* Pathfinding Results ---")
+#     print(f"Robot Size: {robot_h}x{robot_w} cells")
+#     print(f"Start: {SearchStart}, Goal: {SearchGoal}")
+#     print(f"Total cells explored: {len(explored)}")
+#     print(f"Full Path Length (cells): {len(path)-1}")
+#     print(f"Simplified Path Waypoints: {len(simplified_path)}")
+#     print(simplified_path)
+#     converted_simplified_path = [grid_to_real(p) for p in simplified_path]
+#     print("Simplified Path Waypoints (real cm):", converted_simplified_path)
+#     print("------------------------------")
 
-    display_map(Map, path, simplified_path, SearchStart, SearchGoal, explored)
+#     display_map(Map, path, simplified_path, SearchStart, SearchGoal, explored)
 
-else:
-    print("No path found.")
+# else:
+#     print("No path found.")
