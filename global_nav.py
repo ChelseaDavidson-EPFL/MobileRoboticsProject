@@ -8,14 +8,13 @@ from heapq import heappush, heappop
 #  CONSTANTS
 # ============================================================
 # Robot footprint (width × height), centered on the path cell
-robot_w = 22
-robot_h = 22
+robot_w_real_cm = 11
+robot_h_real_cm = 11
 
 # Grid resolution is 200x200 (1m / 0.005m)
 GRID_DIM = 200
+CELL_SIZE_CM = 0.5
 ARENA_SIZE_CM = 100
-CELL_SIZE_CM = ARENA_SIZE_CM / GRID_DIM  
-
 
 # ============================================================
 #  AXIS CONVERSION FUNCTIONS
@@ -27,13 +26,30 @@ def cell_to_cm(cell_index):
 
 def cm_to_cell(cm_value):
     """Converts distance in cm (0-100) to cell index (0-200)."""
-    return cm_value / CELL_SIZE_CM
+    return int(cm_value / CELL_SIZE_CM)
 
 def real_to_grid(coord):
-    return (coord[1]/CELL_SIZE_CM, GRID_DIM-coord[0]/CELL_SIZE_CM)
+    x_cm, y_cm = coord
+    row = GRID_DIM - 1 - int(y_cm / CELL_SIZE_CM)
+    col = int(x_cm / CELL_SIZE_CM)
+    return (row, col)
+    #return (coord[1]/CELL_SIZE_CM, GRID_DIM-coord[0]/CELL_SIZE_CM)
 
 def grid_to_real(coord):
-    return (coord[1]*CELL_SIZE_CM, ARENA_SIZE_CM-coord[0]*CELL_SIZE_CM)
+    row, col = coord
+    x_cm = col * CELL_SIZE_CM
+    y_cm = (GRID_DIM -1 - row) * CELL_SIZE_CM
+    return (x_cm, y_cm)
+    #return (coord[1]* CELL_SIZE_CM, (GRID_DIM-coord[0])*CELL_SIZE_CM)
+
+robot_w = cm_to_cell(robot_w_real_cm)
+robot_h = cm_to_cell(robot_h_real_cm)
+
+# ============================================================
+#  PATH FINDEER (returns path that the robot has to take)
+# ============================================================
+def find_path():
+    return [[0,0],[0,0],[0,0]]
 
 # ============================================================
 #  HEURISTIC (Octile Distance)
@@ -84,7 +100,7 @@ def is_robot_valid(map_grid, cx, cy, robot_h, robot_w):
 # ============================================================
 #  VISUALISATION 
 # ============================================================
-def display_map(map_grid, path, simplified_path, start, goal, explored):
+def display_map(map_grid, path, simplified_path, start, goal):
     # Define colors for the grid
     cmap = ListedColormap(['white', 'black', 'blue', 'green', 'red'])
     map_display = np.zeros_like(map_grid, dtype=object)
@@ -142,8 +158,8 @@ def display_map(map_grid, path, simplified_path, start, goal, explored):
         ax.add_patch(rect)
 
     # Start and Goal    
-    ax.scatter(SearchStart[0], SearchStart[1], s=300, c="blue")
-    ax.scatter(SearchGoal[0], SearchGoal[1], s=300, c="green")
+    ax.scatter(start[1], start[0], s=300, c="blue")
+    ax.scatter(goal[1], goal[0], s=300, c="green")
     
     # Overlay simplified path waypoints
     if simplified_path:
@@ -191,7 +207,8 @@ def display_grid(map_grid):
     y_positions = np.arange(0, 201, 20)
 
     # Convert cell index → centimeters (1 cell = 2 cm)
-    x_labels, y_labels = x_labels, y_labels = grid_to_real((np.arange(0, 201, 20), np.arange(0, 201, 20)))
+    x_labels = x_positions / 2
+    y_labels = (200 - y_positions) / 2  # if you want top=100 cm and bottom=0 cm
 
     plt.xticks(x_positions, x_labels)
     plt.yticks(y_positions, y_labels)
@@ -269,20 +286,21 @@ def grid_search(map_grid, S, G):
             current_pos = came_from[current_pos]
         path.append(S)
         path.reverse()
-        return path, explored
+        return path
 
-    return None, explored
+    return None
 
 # ============================================================
 #  OCCUPANCY GRID CREATION
 # ============================================================
 
-def create_occupancy_grid(obstacles, grid_dim=GRID_DIM, cell_size_m=CELL_SIZE_CM/100, arena_size_m=ARENA_SIZE_CM/100):
+def create_occupancy_grid(obstacles, grid_dim, cell_size_cm, arena_size_cm):
     """
     Creates an occupancy grid (0=free, -1=obstacle) using matplotlib.path.Path.
     """
     grid = np.zeros((grid_dim, grid_dim), dtype=np.int8) # Use -1 for obstacles
-
+    cell_size_m=cell_size_cm/100
+    arena_size_m=arena_size_cm/100
     # Create a meshgrid of all cell centers in meters
     x_coords = np.linspace(0.5 * cell_size_m, arena_size_m - 0.5 * cell_size_m, grid_dim)
     y_coords = np.linspace(0.5 * cell_size_m, arena_size_m - 0.5 * cell_size_m, grid_dim)
@@ -379,40 +397,39 @@ poly3_m_rand = np.array([
 ], dtype=np.float32)
 
 obstacles_list = [poly1_m_rand, poly3_m_rand]
-
+print(obstacles_list)
 # Example Search Parameters (Row, Column)
 # (10, 10) is near the bottom-left corner
-SearchStart_real = (20, 20) 
+SearchStart_real = (10, 20) 
 SearchStart = real_to_grid(SearchStart_real)
 print("SearchStart (grid):", SearchStart)
+print("SearchStart (real):", SearchStart_real)
 # (180, 180) is near the top-right corner
-SearchGoal_real = (80, 80)
+SearchGoal_real = (90, 80)
 SearchGoal = real_to_grid(SearchGoal_real)
 print("SearchGoal (grid):", SearchGoal)
-
+print("SearchGoal (real):", SearchGoal_real)
+print("hi ")
 # 1. Create the Occupancy Map
 # Grid cells: 0 = Free, -1 = Obstacle
-Map = create_occupancy_grid(obstacles_list)
-display_grid(Map)
+Map = create_occupancy_grid(obstacles_list, GRID_DIM, CELL_SIZE_CM, ARENA_SIZE_CM)
+
 # 2. Run the A* Search
-path, explored = grid_search(Map, SearchStart, SearchGoal)
+path = grid_search(Map, SearchStart, SearchGoal)
 
 # 3. Process and Display Results
 if path:
     simplified_path = simplify_path(path)
     
     print("--- A* Pathfinding Results ---")
-    print(f"Robot Size: {robot_h}x{robot_w} cells")
     print(f"Start: {SearchStart}, Goal: {SearchGoal}")
-    print(f"Total cells explored: {len(explored)}")
-    print(f"Full Path Length (cells): {len(path)-1}")
-    print(f"Simplified Path Waypoints: {len(simplified_path)}")
-    print(simplified_path)
+    print(f"Full Path : {path} ")
+    print(f"simplified Path : {simplified_path} ")
     converted_simplified_path = [grid_to_real(p) for p in simplified_path]
     print("Simplified Path Waypoints (real cm):", converted_simplified_path)
     print("------------------------------")
 
-    display_map(Map, path, simplified_path, SearchStart, SearchGoal, explored)
+    display_map(Map, path, simplified_path, SearchStart, SearchGoal)
 
 else:
     print("No path found.")
