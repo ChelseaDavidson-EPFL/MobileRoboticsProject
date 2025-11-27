@@ -9,7 +9,6 @@ def filter_pos(thym: Thymio, pos_on_img, orient_on_img):
     return 
     
 
-def get_data(thym):
 def get_data(thym, ratio_speed):
     pos = Thymio.get(thym, pos)
     motor_speed = Thymio.get(thym, motor_speed)
