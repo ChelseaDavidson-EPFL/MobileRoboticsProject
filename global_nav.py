@@ -3,37 +3,14 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 from matplotlib.path import Path # Used for robust grid creation
 from heapq import heappush, heappop
-
-
-# Grid resolution is 200x200 (1m / 0.005m)
-GRID_DIM = 200
-CELL_SIZE_CM = 0.5
-ARENA_SIZE_CM = 100
+import utils
 
 # ============================================================
-#  AXIS CONVERSION FUNCTIONS
+#  Use globals from utils:
+#  - utils.grid_dim, utils.cell_size_cm, utils.robot_h, utils.robot_w
+#  - utils.arena_width_cm, utils.arena_height_cm
+#  - utils.real_to_grid(), utils.grid_to_real()
 # ============================================================
-
-def cell_to_cm(cell_index):
-    """Converts cell index (0-200) to distance in cm (0-100)."""
-    return cell_index * CELL_SIZE_CM
-
-def cm_to_cell(cm_value):
-    """Converts distance in cm (0-100) to cell index (0-200)."""
-    return cm_value / CELL_SIZE_CM
-
-def real_to_grid(coord):
-    return (coord[1]*2, 200-coord[0]*2)
-
-def grid_to_real(coord):
-    return (coord[1]/2, 100-coord[0]/2)
-
-# ============================================================
-#  CONSTANTS
-# ============================================================
-# Robot footprint (width × height), centered on the path cell
-robot_w = cm_to_cell(2)
-robot_h = cm_to_cell(2)
 
 
 # ============================================================
@@ -50,22 +27,25 @@ def heuristic(a, b):
 # ============================================================
 #  ROBOT COLLISION CHECK (center-based)
 # ============================================================
-def is_robot_valid(map_grid, cx, cy, robot_h, robot_w):
+def is_robot_valid(map_grid, cx, cy):
     """
     Checks whether a robot of size robot_h × robot_w centered at (cx, cy)
-    fits entirely inside free space.
+    fits entirely inside free space. Uses robot dimensions from utils.
     """
+    # Get robot size in cells
+    robot_h_cells = utils.cm_to_cell(utils.robot_h)
+    robot_w_cells = utils.cm_to_cell(utils.robot_w)
+
     # cx is row index (y), cy is column index (x)
-    half_h = robot_h // 2
-    half_w = robot_w // 2
+    half_h = robot_h_cells // 2
+    half_w = robot_w_cells // 2
 
     row_start = cx - half_h
     # Adjusted row_end for odd/even size: rows in range [row_start, row_end] must be robot_h cells total
-    # e.g., for h=3 (half_h=1), row_start=cx-1, row_end=cx+1 -> 3 cells total.
-    row_end   = cx + (robot_h - half_h) 
-    
+    row_end = cx + (robot_h_cells - half_h)
+
     col_start = cy - half_w
-    col_end   = cy + (robot_w - half_w)
+    col_end = cy + (robot_w_cells - half_w)
 
     # Boundary check (row_end and col_end are exclusive indices for slicing)
     if row_start < 0 or col_start < 0 or row_end > map_grid.shape[0] or col_end > map_grid.shape[1]:
@@ -116,10 +96,13 @@ def display_map(map_grid, path, simplified_path, start, goal):
     ax.imshow(map_numeric_display, cmap=cmap)
 
     # Set tick positions
-    x_labels, y_labels = grid_to_real((np.arange(0, 201, 20), np.arange(0, 201, 20)))
+    x_positions = np.arange(0, 201, 20)
+    y_positions = np.arange(0, 201, 20)
+    x_labels = [int(utils.cell_to_cm(col)) for col in x_positions]
+    y_labels = [int(utils.arena_height_cm - utils.cell_to_cm(row)) for row in y_positions]
 
-    plt.xticks(np.arange(0, 201, 20), x_labels)
-    plt.yticks(np.arange(0, 201, 20), y_labels)
+    plt.xticks(x_positions, x_labels)
+    plt.yticks(y_positions, y_labels)
     ax.set_xlabel('X Dimension (cm)')
     ax.set_ylabel('Y Dimension (cm)')
     
@@ -127,24 +110,26 @@ def display_map(map_grid, path, simplified_path, start, goal):
     ax.set_xticks(np.arange(-0.5, map_grid.shape[1], 1), minor=True)
     ax.set_yticks(np.arange(-0.5, map_grid.shape[0], 1), minor=True)
     ax.grid(which='minor', color='gray', linestyle='-', linewidth=0.15)
-    plt.title("A* Pathfinding | Full Path & Simplified Waypoints")
+    plt.title("Pathfinding | Full Path & Simplified Waypoints")
 
     # Draw robot footprint at each path cell
-    half_h = robot_h / 2
-    half_w = robot_w / 2
+    robot_h_cells = utils.cm_to_cell(utils.robot_h)
+    robot_w_cells = utils.cm_to_cell(utils.robot_w)
+    half_h = robot_h_cells / 2
+    half_w = robot_w_cells / 2
 
     for (cx, cy) in path:
         # Note: (cx, cy) is the center (row, col). For plotting, (col, row) is (x, y).
         row_start = cx - half_h
         col_start = cy - half_w
 
-        rect = plt.Rectangle((col_start, row_start), # Bottom-left corner for plotting (x, y) = (col_start, row_start)
-               robot_w,robot_h, linewidth=1.0,edgecolor='cyan',facecolor='cyan',alpha=0.05)
+        rect = plt.Rectangle((col_start, row_start),
+               robot_w_cells, robot_h_cells, linewidth=1.0, edgecolor='cyan', facecolor='cyan', alpha=0.05)
         ax.add_patch(rect)
 
-    # Start and Goal    
-    ax.scatter(start[0], start[1], s=300, c="blue")
-    ax.scatter(goal[0], goal[1], s=300, c="green")
+    # Start and Goal (note: scatter uses (x, y) = (col, row))
+    ax.scatter(start[1], start[0], s=300, c="blue")
+    ax.scatter(goal[1], goal[0], s=300, c="green")
     
     # Overlay simplified path waypoints
     if simplified_path:
@@ -167,7 +152,7 @@ def display_map(map_grid, path, simplified_path, start, goal):
 # ============================================================
 # display only map
 # ============================================================
-def display_grid(map_grid):
+def display_grid(map_grid, start=None, goal=None):
     cmap = ListedColormap(['white', 'black', 'red', 'green', 'blue'])
     map_display = np.zeros_like(map_grid, dtype=object)
 
@@ -175,31 +160,33 @@ def display_grid(map_grid):
     map_display[map_grid == -1] = 'red'  # Obstacle
     map_display[map_grid == 0] = 'white'   # Free Space
 
-    map_display[SearchStart] = 'blue'
-    map_display[SearchGoal] = 'green'
+    if start is not None:
+        map_display[start] = 'blue'
+    if goal is not None:
+        map_display[goal] = 'green'
 
     # Convert color names to numbers
     color_mapping = {'white': 0, 'black': 1, 'red': 2, 'blue': 3,
                      'green': 4}
     map_numeric_display = np.vectorize(color_mapping.get)(map_display)
 
-    # Show map 
+    # Show map
     fig, ax = plt.subplots(figsize=(8, 8))
     ax.imshow(map_numeric_display, cmap=cmap)
 
-    # Set tick positions (in pixel indices)
-    x_positions = np.arange(0, 201, 20)  
+    # Set tick positions
+    x_positions = np.arange(0, 201, 20)
     y_positions = np.arange(0, 201, 20)
 
-    # Convert cell index → centimeters (1 cell = 2 cm)
-    x_labels = x_positions / 2
-    y_labels = (200 - y_positions) / 2  # if you want top=100 cm and bottom=0 cm
+    # Convert cell indices to cm labels
+    x_labels = [int(utils.cell_to_cm(col)) for col in x_positions]
+    y_labels = [int(utils.arena_height_cm - utils.cell_to_cm(row)) for row in y_positions]
 
     plt.xticks(x_positions, x_labels)
     plt.yticks(y_positions, y_labels)
     ax.set_xlabel('X Dimension (cm)')
     ax.set_ylabel('Y Dimension (cm)')
-    
+
     # Grid lines
     ax.set_xticks(np.arange(-0.5, map_grid.shape[1], 1), minor=True)
     ax.set_yticks(np.arange(-0.5, map_grid.shape[0], 1), minor=True)
@@ -208,7 +195,7 @@ def display_grid(map_grid):
     plt.show()
 
 # ============================================================
-#  PATH FINDEER (returns path that the robot has to take)
+#  PATH FINDER (returns path that the robot has to take)
 # ============================================================
 def find_path(map_grid, S, G):
     """Finds the shortest path using A* with 8-connectivity and robot collision checking."""
@@ -248,7 +235,7 @@ def find_path(map_grid, S, G):
                 continue
 
             # Robot Collision Check
-            if not is_robot_valid(map_grid, nx, ny, robot_h, robot_w):
+            if not is_robot_valid(map_grid, nx, ny):
                 continue
 
             # Calculate movement cost
@@ -274,6 +261,121 @@ def find_path(map_grid, S, G):
         return path
 
     return None
+
+# ============================================================
+#  GRID EXPANSION using cv2 dilation (for expanded_dijkstra)
+# ============================================================
+import cv2
+
+def expand_grid_by_robot(grid, robot_size_cells):
+    """
+    Expands obstacles in the grid by dilating them using cv2.
+    This effectively grows obstacles by robot_size_cells/2 in all directions.
+
+    Args:
+        grid: occupancy grid (0=free, -1=obstacle)
+        robot_size_cells: robot size in cells (will dilate by half this)
+
+    Returns:
+        expanded grid with dilated obstacles
+    """
+    # Convert to binary image (255 = obstacle, 0 = free)
+    binary = np.where(grid == -1, 255, 0).astype(np.uint8)
+
+    # Create circular kernel for dilation (half robot size as radius)
+    kernel_size = max(1, int(robot_size_cells / 2))
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size * 2 + 1, kernel_size * 2 + 1))
+
+    # Dilate obstacles
+    dilated = cv2.dilate(binary, kernel, iterations=1)
+
+    # Convert back to occupancy grid format
+    expanded_grid = np.where(dilated == 255, -1, 0).astype(np.int8)
+
+    return expanded_grid
+
+
+def expanded_dijkstra(grid, start, goal):
+    """
+    Pathfinding with expanded obstacles using Dijkstra's algorithm.
+    Robot is treated as a point after expanding obstacles by robot size.
+
+    Args:
+        grid: occupancy grid from vision (0=free, -1=obstacle)
+        start: (row, col) start position in grid coordinates
+        goal: (row, col) goal position in grid coordinates
+
+    Returns:
+        path: list of (row, col) tuples, or None if no path found
+        expanded_grid: the occupancy grid with expanded obstacles
+    """
+    # Get robot size in cells
+    robot_size_cells = utils.cm_to_cell(max(utils.robot_h, utils.robot_w))
+
+    # Expand obstacles by robot size using cv2 dilation
+    expanded_grid = expand_grid_by_robot(grid, robot_size_cells)
+
+    # Run Dijkstra (robot as point)
+    came_from = {}
+    g_costs = {start: 0}
+    explored = set()
+
+    # Priority queue: (g_cost, position)
+    open_set = [(0, start)]
+
+    current_pos = start
+
+    while open_set:
+        current_g_cost, current_pos = heappop(open_set)
+
+        # Stop condition
+        if current_pos == goal:
+            break
+
+        # Skip if already explored
+        if current_pos in explored:
+            continue
+        explored.add(current_pos)
+
+        # 8-connected neighbors
+        directions = [
+            (-1, 0), (1, 0), (0, -1), (0, 1),  # Cardinal
+            (-1, -1), (-1, 1), (1, -1), (1, 1)  # Diagonal
+        ]
+
+        for dr, dc in directions:
+            nx, ny = current_pos[0] + dr, current_pos[1] + dc
+            neighbor = (nx, ny)
+
+            # Bounds check
+            if not (0 <= nx < expanded_grid.shape[0] and 0 <= ny < expanded_grid.shape[1]):
+                continue
+
+            # Simple obstacle check (robot is a point now)
+            if expanded_grid[nx, ny] == -1:
+                continue
+
+            # Movement cost (sqrt(2) for diagonal, 1 for cardinal)
+            move_cost = np.sqrt(2) if (abs(dr) == 1 and abs(dc) == 1) else 1
+            tentative_g_cost = current_g_cost + move_cost
+
+            if neighbor not in g_costs or tentative_g_cost < g_costs[neighbor]:
+                g_costs[neighbor] = tentative_g_cost
+                came_from[neighbor] = current_pos
+                heappush(open_set, (tentative_g_cost, neighbor))
+
+    # Reconstruct path
+    if current_pos == goal:
+        path = []
+        while current_pos != start:
+            path.append(current_pos)
+            current_pos = came_from[current_pos]
+        path.append(start)
+        path.reverse()
+        return path, expanded_grid
+
+    return None, expanded_grid
+
 
 # ============================================================
 #  OCCUPANCY GRID CREATION - Now in vision

@@ -1,8 +1,10 @@
 import numpy as np
 import cv2
+import sys
 from matplotlib.path import Path
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
+import utils
 
 """
 Setup notes:
@@ -32,17 +34,21 @@ class Vision:
         self.grid = None
         self.cell_size_cm = None
 
+        # Robot initial pose (stored during getEnvironment)
+        self.initial_robot_pos = None  # (X, Y) in meters
+        self.initial_robot_orient = None  # heading in radians
+
         # Store video capture
         self.cap = None
         self.getEnvironment()
 
     def getEnvironment(self):
          # Capture a single frame from webcam
-        self.cap = cv2.VideoCapture(1) # 1 for Arthur, 0 for Chelsea
+        self.cap = cv2.VideoCapture(0) # 1 for Arthur, 0 for Chelsea
 
         if not self.cap.isOpened():
             print("Error: Could not access the webcam.")
-            exit()
+            sys.exit()
 
         waitNumber = 30
         waitIndx = 0
@@ -50,7 +56,7 @@ class Vision:
             ret, frame = self.cap.read()
             if not ret:
                 print("Camera failed to capture the frame.")
-                exit()
+                sys.exit()
 
             vis = frame.copy()
 
@@ -78,6 +84,10 @@ class Vision:
             # Convert to global frame
             X, Y = self.getGlobalLocation(robot_cam_x, robot_cam_y)
 
+            # Store initial robot pose
+            self.initial_robot_pos = (X, Y)
+            self.initial_robot_orient = robot_heading_angle
+
             # ----------------------------
             # 4. Find obstacles
             # ----------------------------
@@ -98,19 +108,23 @@ class Vision:
             self.visualiseObstacles(vis, polygons)
             break
         
-        # Show the result
+        # Show the result (auto-closes after 3 seconds to avoid Jupyter kernel crash)
         cv2.imshow("Initial Environment", vis)
-        cv2.waitKey(0)
+        cv2.waitKey(3000)
         cv2.destroyAllWindows()
 
     def createGrid(self, arena_w, arena_h, obstacles):
-        # def create_occupancy_grid(obstacles, grid_dim=GRID_DIM, cell_size_m=CELL_SIZE_CM/100, arena_size_m=ARENA_SIZE_CM/100):
         """
-        Creates a grid in world frame coordinates where the bottom left corner of the arena is 0,0 so the top right corner 
+        Creates a grid in world frame coordinates where the bottom left corner of the arena is 0,0 so the top right corner
         will be arena_w, arena_h. Both the robot position and obstacle_polygons are relative to this 0,0 frame. The grid has (0=free, -1=obstacle) using matplotlib.path.Path.
         """
-        self.cell_size_cm = (arena_w/self.grid_dim)*100 
+        self.cell_size_cm = (arena_w/self.grid_dim)*100
         cell_size_m = self.cell_size_cm/100
+
+        # Set global variables in utils
+        utils.cell_size_cm = self.cell_size_cm
+        utils.arena_width_cm = arena_w * 100  # Convert m to cm
+        utils.arena_height_cm = arena_h * 100  # Convert m to cm
         grid = np.zeros((self.grid_dim, self.grid_dim), dtype=np.int8) # Use -1 for obstacles
 
         # Create a meshgrid of all cell centers in meters
@@ -147,8 +161,15 @@ class Vision:
 
     def getGrid(self):
         return self.grid
-    
-    def display_grid(self):
+
+    def getCellSizeCm(self):
+        return self.cell_size_cm
+
+    def getInitialRobotPose(self):
+        """Returns the robot pose detected during initialization: ((X, Y) in meters, heading in radians)"""
+        return self.initial_robot_pos, self.initial_robot_orient
+
+    def display_grid(self, start_cell=None, goal_cell=None):
         map_grid = self.grid
         cmap = ListedColormap(['white', 'black', 'red', 'green', 'blue'])
         map_display = np.zeros_like(map_grid, dtype=object)
@@ -157,8 +178,10 @@ class Vision:
         map_display[map_grid == -1] = 'red'  # Obstacle
         map_display[map_grid == 0] = 'white'   # Free Space
 
-        # map_display[SearchStart] = 'blue'
-        # map_display[SearchGoal] = 'green'
+        if start_cell is not None:
+            map_display[start_cell] = 'blue'
+        if goal_cell is not None:
+            map_display[goal_cell] = 'green'
 
         # Convert color names to numbers
         color_mapping = {'white': 0, 'black': 1, 'red': 2, 'blue': 3,
@@ -169,12 +192,13 @@ class Vision:
         fig, ax = plt.subplots(figsize=(8, 8))
         ax.imshow(map_numeric_display, cmap=cmap)
 
-        # Set tick positions (in pixel indices)
-        x_positions = np.arange(0, 201, 20)  
+        # Set tick positions (in cell indices)
+        x_positions = np.arange(0, 201, 20)
         y_positions = np.arange(0, 201, 20)
 
-        # Convert cell index → centimeters (1 cell = 2 cm)
-        x_labels,y_labels=self.grid_to_real((x_positions,y_positions))
+        # Convert cell indices to cm labels
+        x_labels = [int(utils.cell_to_cm(col)) for col in x_positions]
+        y_labels = [int(utils.arena_height_cm - utils.cell_to_cm(row)) for row in y_positions]
         plt.xticks(x_positions, x_labels)
         plt.yticks(y_positions, y_labels)
         ax.set_xlabel('X Dimension (cm)')
@@ -188,22 +212,9 @@ class Vision:
         plt.show()
 
     # ============================================================
-    #  AXIS CONVERSION FUNCTIONS
+    #  AXIS CONVERSION FUNCTIONS - Now use utils module
     # ============================================================
-
-    def cell_to_cm(self, cell_index):
-        """Converts cell index (0-200) to distance in cm (0-100)."""
-        return cell_index * self.cell_size_cm
-
-    def cm_to_cell(self, cm_value):
-        """Converts distance in cm (0-100) to cell index (0-200)."""
-        return cm_value / self.cell_size_cm
-
-    def real_to_grid(self, coord):
-        return (coord[1]/self.cell_size_cm, self.grid_dim-coord[0]/self.cell_size_cm)
-
-    def grid_to_real(self, coord):
-        return (coord[1]*self.cell_size_cm, (self.arena_height_m*100)-coord[0]*self.cell_size_cm)
+    # Use utils.real_to_grid() and utils.grid_to_real() instead
 
     def getArenaCornerPixelsAndRealArenaSize(self, image):
         """
