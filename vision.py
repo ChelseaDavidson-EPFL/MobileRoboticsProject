@@ -44,11 +44,18 @@ class Vision:
 
     def getEnvironment(self):
          # Capture a single frame from webcam
-        self.cap = cv2.VideoCapture(0) # 1 for Arthur, 0 for Chelsea
+        # Use DirectShow backend on Windows for faster initialization
+        self.cap = cv2.VideoCapture(1, cv2.CAP_DSHOW) # 1 for Arthur, 0 for Chelsea
 
         if not self.cap.isOpened():
             print("Error: Could not access the webcam.")
             sys.exit()
+        
+        # Set camera properties for faster capture
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)  # Lower resolution = faster
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        self.cap.set(cv2.CAP_PROP_FPS, 30)  # Explicitly set FPS
+        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Reduce buffer
 
         waitNumber = 30
         waitIndx = 0

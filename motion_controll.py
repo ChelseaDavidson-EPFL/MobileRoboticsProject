@@ -2,10 +2,12 @@ import numpy as np
 import math
 from thymio import Thymio
 
-#radius around witch the goal is reached
-GOAL_RADUIS = 2
+#radius around witch the goal is reached (in cm)
+GOAL_RADUIS = 1
 # Forward speed
-FWD_SPEED = 500
+FWD_SPEED = 100
+# Rotation speed
+ROT_SPEED = 30
 # angle at witch it starts to go forward
 MAX_ANGLE = 0.5
 # Astolfi angle gain
@@ -25,21 +27,24 @@ def follow_path(thym: Thymio, next_goal):
         return True
     
     
-    angle_goal = math.atan2(dx, dy)
+    # angle_goal: 0=X+, π/2=Y+, -π/2=Y-, π=X-
+    angle_goal = math.atan2(dy, dx)
     diff_angle = angle_goal - thym.orient
+
+    print(f"pos: [{thym.pos[0]:.1f}, {thym.pos[1]:.1f}], goal: [{next_goal[0]:.1f}, {next_goal[1]:.1f}], dist: {dist_goal:.2f}, angle_goal: {angle_goal:.2f}, orient: {thym.orient:.2f}, diff: {diff_angle:.2f}")
 
     if(abs(diff_angle)>MAX_ANGLE):
         if(diff_angle>=0):
-            thym.set_motor_speeds([100, -100])
+            thym.set_motor_speeds([ROT_SPEED, -ROT_SPEED])
         else:
-            thym.set_motor_speeds([-100, 100])
+            thym.set_motor_speeds([-ROT_SPEED, ROT_SPEED])
         
     # Astolfi implementation
     angle_speed = K_ASTOL * diff_angle * DIST_TO_WHEELS
     left_speed = int(FWD_SPEED - angle_speed)
     right_speed = int(FWD_SPEED + angle_speed)
     
-    print(f"angle_speed: {angle_speed}, left_speed: {left_speed}, right_speed: {right_speed}")
+    # print(f"angle_speed: {angle_speed}, left_speed: {left_speed}, right_speed: {right_speed}")
 
     thym.set_motor_speeds([left_speed, right_speed])
 
