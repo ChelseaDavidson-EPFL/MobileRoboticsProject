@@ -110,7 +110,7 @@ def display_map(map_grid, path, simplified_path, start, goal):
     ax.set_xticks(np.arange(-0.5, map_grid.shape[1], 1), minor=True)
     ax.set_yticks(np.arange(-0.5, map_grid.shape[0], 1), minor=True)
     ax.grid(which='minor', color='gray', linestyle='-', linewidth=0.15)
-    plt.title("A* Pathfinding | Full Path & Simplified Waypoints")
+    plt.title("Pathfinding | Full Path & Simplified Waypoints")
 
     # Draw robot footprint at each path cell
     robot_h_cells = utils.cm_to_cell(utils.robot_h)
