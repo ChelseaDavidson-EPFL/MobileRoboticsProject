@@ -21,7 +21,7 @@ Potential TODOs:
 class Vision:
     def __init__(self):
         self.arenaMarkerSize = 0.02 #2cm
-        self.grid_dim = 200
+        self.grid_dim = utils.GRID_DIM
         self.arenaMarkerDict = cv2.aruco.DICT_4X4_50
         self.robotMarkerDict = cv2.aruco.DICT_5X5_50
 
