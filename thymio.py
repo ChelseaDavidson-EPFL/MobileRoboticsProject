@@ -9,7 +9,7 @@ class Thymio :
     motor_speeds = [0, 0]
     pos = [0, 0]
     orient = 0
-    nav_mode = "GLOBAL"
+    nav_mode = "GLOBAL" # navigation mode: "GLOBAL" or "LOCAL"
     FORWARD = 1
     DELTA_T = 4  # seconds forward
     SAMPLING = 0.1  # timer loop period
@@ -50,7 +50,6 @@ class Thymio :
             print("Thymio unlocked")
 
     def set_motor_speeds(self, speeds):
-        
         self.node.flush()
         self.motor_speeds = speeds
         self.node.send_set_variables({"motor.left.target": [speeds[0]], "motor.right.target": [speeds[1]]})
