@@ -45,7 +45,7 @@ class Vision:
     def getEnvironment(self):
          # Capture a single frame from webcam
         # Use DirectShow backend on Windows for faster initialization
-        self.cap = cv2.VideoCapture(1, cv2.CAP_DSHOW) # 1 for Arthur, 0 for Chelsea
+        self.cap = cv2.VideoCapture(0, cv2.CAP_DSHOW) # 1 for Arthur, 0 for Chelsea and Eleo
 
         if not self.cap.isOpened():
             print("Error: Could not access the webcam.")
