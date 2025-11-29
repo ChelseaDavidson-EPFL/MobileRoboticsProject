@@ -17,7 +17,7 @@ class Thymio :
     # Button states
     button_forward = 0
     button_center = 0
-
+    button_backward = 0
 
     # Constructor
     def __init__(self, pos_init, orient):
@@ -69,11 +69,6 @@ class Thymio :
     
     def stop(self):
         self.set_motor_speeds([0, 0])
-    
-    # get method
-    def get(self, attr, default=None):
-        return getattr(self, attr, default)
-    
 
 
     async def update_buttons(self): # Read the current values of several buttons
