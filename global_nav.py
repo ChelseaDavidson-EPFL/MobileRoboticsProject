@@ -5,13 +5,6 @@ from matplotlib.path import Path # Used for robust grid creation
 from heapq import heappush, heappop
 import utils
 
-# ============================================================
-#  Use globals from utils:
-#  - utils.GRID_DIM, utils.cell_size_cm, utils.ROBOT_H, utils.ROBOT_W
-#  - utils.arena_width_cm, utils.arena_height_cm
-#  - utils.real_to_grid(), utils.grid_to_real()
-# ============================================================
-
 
 # ============================================================
 #  HEURISTIC (Octile Distance)
@@ -22,45 +15,6 @@ def heuristic(a, b):
     dy = abs(a[1] - b[1])
     # D = 1, D_diag = sqrt(2)
     return max(dx, dy) + (np.sqrt(2) - 1) * min(dx, dy)
-
-
-# ============================================================
-#  ROBOT COLLISION CHECK (center-based)
-# ============================================================
-def is_robot_valid(map_grid, cx, cy):
-    """
-    Checks whether a robot of size ROBOT_H × ROBOT_W centered at (cx, cy)
-    fits entirely inside free space. Uses robot dimensions from utils.
-    """
-    # Get robot size in cells
-    robot_h_cells = utils.cm_to_cell(utils.ROBOT_H)
-    robot_w_cells = utils.cm_to_cell(utils.ROBOT_W)
-
-    # cx is row index (y), cy is column index (x)
-    half_h = robot_h_cells // 2
-    half_w = robot_w_cells // 2
-
-    row_start = cx - half_h
-    # Adjusted row_end for odd/even size: rows in range [row_start, row_end] must be robot_h cells total
-    row_end = cx + (robot_h_cells - half_h)
-
-    col_start = cy - half_w
-    col_end = cy + (robot_w_cells - half_w)
-
-    # Boundary check (row_end and col_end are exclusive indices for slicing)
-    if row_start < 0 or col_start < 0 or row_end > map_grid.shape[0] or col_end > map_grid.shape[1]:
-        return False
-
-    # Obstacle check: check if any cell in the robot's footprint is occupied (-1)
-    # Note: map_grid[row_start:row_end, col_start:col_end]
-    footprint = map_grid[row_start:row_end, col_start:col_end]
-    
-    # Check if any cell in the footprint is an obstacle (-1)
-    if np.any(footprint == -1):
-        return False
-
-    return True
-
 
 # ============================================================
 #  VISUALISATION 
@@ -194,80 +148,13 @@ def display_grid(map_grid, start=None, goal=None):
 
     plt.show()
 
-# ============================================================
-#  PATH FINDER (returns path that the robot has to take)
-# ============================================================
-def find_path(map_grid, S, G):
-    """Finds the shortest path using A* with 8-connectivity and robot collision checking."""
-    
-    came_from = {}
-    g_costs = {S: 0}
-    explored = set()
-
-    # Priority Queue: (f_cost, g_cost, position)
-    open_set = [(heuristic(S, G), 0, S)] 
-
-    while open_set:
-        current_f_cost, current_g_cost, current_pos = heappop(open_set)
-        
-        # Stop condition
-        if current_pos == G:
-            break
-        
-        # Optimization: Don't re-explore if we found a better path already
-        if current_pos in explored:
-            continue
-            
-        explored.add(current_pos)
-
-        # 8-connected neighbors (dx, dy)
-        directions = [
-            (-1, 0), (1, 0), (0, -1), (0, 1), # Cardinal
-            (-1, -1), (-1, 1), (1, -1), (1, 1) # Diagonal
-        ]
-
-        for dr, dc in directions:
-            nx, ny = current_pos[0] + dr, current_pos[1] + dc
-            neighbor = (nx, ny)
-
-            # Bounds Check
-            if not (0 <= nx < map_grid.shape[0] and 0 <= ny < map_grid.shape[1]):
-                continue
-
-            # Robot Collision Check
-            if not is_robot_valid(map_grid, nx, ny):
-                continue
-
-            # Calculate movement cost
-            move_cost = np.sqrt(2) if (abs(dr) == 1 and abs(dc) == 1) else 1
-            
-            # Penalize moving over non-free cells (map_grid[nx, ny] is >= 0)
-            tentative_g_cost = current_g_cost + move_cost + map_grid[nx, ny]
-
-            if neighbor not in g_costs or tentative_g_cost < g_costs[neighbor]:
-                g_costs[neighbor] = tentative_g_cost
-                came_from[neighbor] = current_pos
-                f_cost = tentative_g_cost + heuristic(neighbor, G)
-                heappush(open_set, (f_cost, tentative_g_cost, neighbor))
-
-    # Reconstruct path
-    if current_pos == G:
-        path = []
-        while current_pos != S:
-            path.append(current_pos)
-            current_pos = came_from[current_pos]
-        path.append(S)
-        path.reverse()
-        return path
-
-    return None
 
 # ============================================================
 #  GRID EXPANSION using cv2 dilation (for expanded_dijkstra)
 # ============================================================
 import cv2
 
-def expand_grid_by_robot(grid, robot_size_cells):
+def expand_grid_by_robot(grid, robot_size_cells, safety_margin=0):
     """
     Expands obstacles in the grid by dilating them using cv2.
     This effectively grows obstacles by robot_size_cells/2 in all directions.
@@ -282,9 +169,13 @@ def expand_grid_by_robot(grid, robot_size_cells):
     # Convert to binary image (255 = obstacle, 0 = free)
     binary = np.where(grid == -1, 255, 0).astype(np.uint8)
 
-    # Create circular kernel for dilation (half robot size as radius)
-    kernel_size = max(1, int(robot_size_cells / 2))
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size * 2 + 1, kernel_size * 2 + 1))
+    # Circular kernel option
+    #kernel_size = max(1, int(robot_size_cells / 2))
+    #kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size * 2 + 1, kernel_size * 2 + 1))
+
+    # Rectangular kernel option
+    kernel_size = max(1, int(robot_size_cells / 2)+safety_margin)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_size * 2 + 1, kernel_size * 2 + 1))
 
     # Dilate obstacles
     dilated = cv2.dilate(binary, kernel, iterations=1)
@@ -293,6 +184,89 @@ def expand_grid_by_robot(grid, robot_size_cells):
     expanded_grid = np.where(dilated == 255, -1, 0).astype(np.int8)
 
     return expanded_grid
+
+
+# ============================================================
+#  PATH FINDER (returns path that the robot has to take)
+# ============================================================
+def expanded_a_star(grid, start, goal):
+    """
+    Finds the shortest path using A* with 8-connectivity.
+    Robot is treated as a point after expanding obstacles by robot size.
+
+    Args:
+        grid: occupancy grid from vision (0=free, -1=obstacle)
+        start: (row, col) start position in grid coordinates
+        goal: (row, col) goal position in grid coordinates
+
+    Returns:
+        path: list of (row, col) tuples, or None if no path found
+        expanded_grid: the occupancy grid with expanded obstacles
+    """
+    # Get robot size in cells and expand obstacles
+    robot_size_cells = utils.cm_to_cell(max(utils.ROBOT_H, utils.ROBOT_W))
+    expanded_grid = expand_grid_by_robot(grid, robot_size_cells, 6)
+
+    came_from = {}
+    g_costs = {start: 0}
+    explored = set()
+
+    # Priority Queue: (f_cost, g_cost, position)
+    open_set = [(heuristic(start, goal), 0, start)]
+    current_pos = start
+
+    while open_set:
+        current_f_cost, current_g_cost, current_pos = heappop(open_set)
+
+        # Stop condition
+        if current_pos == goal:
+            break
+
+        # Optimization: Don't re-explore if we found a better path already
+        if current_pos in explored:
+            continue
+
+        explored.add(current_pos)
+
+        # 8-connected neighbors (dx, dy)
+        directions = [
+            (-1, 0), (1, 0), (0, -1), (0, 1),  # Cardinal
+            (-1, -1), (-1, 1), (1, -1), (1, 1)  # Diagonal
+        ]
+
+        for dr, dc in directions:
+            nx, ny = current_pos[0] + dr, current_pos[1] + dc
+            neighbor = (nx, ny)
+
+            # Bounds Check
+            if not (0 <= nx < expanded_grid.shape[0] and 0 <= ny < expanded_grid.shape[1]):
+                continue
+
+            # Simple obstacle check (robot is a point now)
+            if expanded_grid[nx, ny] == -1:
+                continue
+
+            # Calculate movement cost
+            move_cost = np.sqrt(2) if (abs(dr) == 1 and abs(dc) == 1) else 1
+            tentative_g_cost = current_g_cost + move_cost
+
+            if neighbor not in g_costs or tentative_g_cost < g_costs[neighbor]:
+                g_costs[neighbor] = tentative_g_cost
+                came_from[neighbor] = current_pos
+                f_cost = tentative_g_cost + heuristic(neighbor, goal)
+                heappush(open_set, (f_cost, tentative_g_cost, neighbor))
+
+    # Reconstruct path
+    if current_pos == goal:
+        path = []
+        while current_pos != start:
+            path.append(current_pos)
+            current_pos = came_from[current_pos]
+        path.append(start)
+        path.reverse()
+        return path, expanded_grid
+
+    return None, expanded_grid
 
 
 def expanded_dijkstra(grid, start, goal):
@@ -313,7 +287,7 @@ def expanded_dijkstra(grid, start, goal):
     robot_size_cells = utils.cm_to_cell(max(utils.ROBOT_H, utils.ROBOT_W))
 
     # Expand obstacles by robot size using cv2 dilation
-    expanded_grid = expand_grid_by_robot(grid, robot_size_cells)
+    expanded_grid = expand_grid_by_robot(grid, robot_size_cells,6)
 
     # Run Dijkstra (robot as point)
     came_from = {}
@@ -378,11 +352,6 @@ def expanded_dijkstra(grid, start, goal):
 
 
 # ============================================================
-#  OCCUPANCY GRID CREATION - Now in vision
-# ============================================================
-
-
-# ============================================================
 #  PATH SIMPLIFICATION into waypoints
 # ============================================================
 
@@ -412,74 +381,76 @@ def simplify_path(full_path):
             current_direction = next_direction 
 
     simplified_path.append(full_path[-1]) 
+
+    #simplified_path = rdp_simplify_safe(simplified_path, grid=None, epsilon=2.0)
     
     return simplified_path
 
+def rdp_simplify_safe(path, grid, epsilon=2.0):
+      """RDP that only removes points if path stays obstacle-free."""
+      if len(path) < 3:
+          return path
+
+      start, end = np.array(path[0]), np.array(path[-1])
+      line_vec = end - start
+      line_len = np.linalg.norm(line_vec)
+
+      if line_len == 0:
+          return [path[0], path[-1]]
+
+      # Find max distance point
+      max_dist = 0
+      max_idx = 0
+      for i in range(1, len(path) - 1):
+          point = np.array(path[i])
+          dist = np.abs(np.cross(line_vec, start - point)) / line_len
+          if dist > max_dist:
+              max_dist = dist
+              max_idx = i
+
+      # If close enough AND line-of-sight is clear, simplify
+      if max_dist <= epsilon and line_of_sight(grid, path[0], path[-1]):
+          return [path[0], path[-1]]
+      else:
+          left = rdp_simplify_safe(path[:max_idx + 1], grid, epsilon)
+          right = rdp_simplify_safe(path[max_idx:], grid, epsilon)
+          return left[:-1] + right
+
 # ============================================================
-#  EXECUTION BLOCK
+#  EXECUTION 
 # ============================================================
 
-# # Define example obstacles in meters (mimicking cv2.approxPolyDP output)
-# # 1. Large Triangle (Vertices in meters)
-# poly1_m_rand = np.array([
-#     [[0.40, 0.20]],
-#     [[0.60, 0.45]],
-#     [[0.35, 0.70]]
-# ], dtype=np.float32)
+def find_path(mode, grid, start, goal):
+    """
+    Main function to find path using specified mode.
 
-# # 2. Inverted L-Shape (Vertices in meters)
-# poly2_m_rand = np.array([
-#     [[0.75, 0.65]],
-#     [[0.90, 0.65]],
-#     [[0.90, 0.90]],
-#     [[0.65, 0.90]],
-#     [[0.65, 0.80]],
-#     [[0.75, 0.80]]
-# ], dtype=np.float32)
+    Args:
+        mode: 'a_star' or 'dijkstra'
+        grid: occupancy grid (0=free, -1=obstacle)
+        start: (row, col) start position
+        goal: (row, col) goal position
+    """
+    if mode == 'a_star':
+        path, expanded_grid = expanded_a_star(grid, start, goal)
+    elif mode == 'dijkstra':
+        path, expanded_grid = expanded_dijkstra(grid, start, goal)
+    else:
+        raise ValueError("Invalid mode. Choose 'a_star' or 'dijkstra'.")
 
-# # 3. Narrow Rectangle (Vertices in meters)
-# poly3_m_rand = np.array([
-#     [[0.10, 0.85]],
-#     [[0.20, 0.85]],
-#     [[0.20, 0.95]],
-#     [[0.10, 0.95]]
-# ], dtype=np.float32)
-
-# obstacles_list = [poly1_m_rand, poly3_m_rand]
-
-# # Example Search Parameters (Row, Column)
-# # (10, 10) is near the bottom-left corner
-# SearchStart_real = (20, 20) 
-# SearchStart = real_to_grid(SearchStart_real)
-# print("SearchStart (grid):", SearchStart)
-# # (180, 180) is near the top-right corner
-# SearchGoal_real = (80, 80)
-# SearchGoal = real_to_grid(SearchGoal_real)
-# print("SearchGoal (grid):", SearchGoal)
-
-# # 1. Create the Occupancy Map
-# # Grid cells: 0 = Free, -1 = Obstacle
-# Map = create_occupancy_grid(obstacles_list)
-
-# # 2. Run the A* Search
-# path, explored = grid_search(Map, SearchStart, SearchGoal)
-
-# # 3. Process and Display Results
-# if path:
-#     simplified_path = simplify_path(path)
+    if path:
+        simplified_path = simplify_path(path)
     
-#     print("--- A* Pathfinding Results ---")
-#     print(f"Robot Size: {robot_h}x{robot_w} cells")
-#     print(f"Start: {SearchStart}, Goal: {SearchGoal}")
-#     print(f"Total cells explored: {len(explored)}")
-#     print(f"Full Path Length (cells): {len(path)-1}")
-#     print(f"Simplified Path Waypoints: {len(simplified_path)}")
-#     print(simplified_path)
-#     converted_simplified_path = [grid_to_real(p) for p in simplified_path]
-#     print("Simplified Path Waypoints (real cm):", converted_simplified_path)
-#     print("------------------------------")
+        print("--- Pathfinding Results ---")
+        print(f"Start: {start}, Goal: {goal}")
+        print(f"Simplified Path (in grid): {simplified_path}")
+        converted_simplified_path = [utils.grid_to_real(p) for p in simplified_path]
+        print("Simplified Path Waypoints (real cm):", converted_simplified_path)
+        print("------------------------------")
 
-#     display_map(Map, path, simplified_path, SearchStart, SearchGoal, explored)
+        display_map(grid, path, simplified_path, start, goal)
+    else:
+        simplified_path = None
+        print("No path found.")
 
-# else:
-#     print("No path found.")
+    return simplified_path, expanded_grid
+
