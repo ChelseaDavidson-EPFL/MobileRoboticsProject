@@ -381,12 +381,9 @@ def simplify_path(full_path):
             current_direction = next_direction 
 
     simplified_path.append(full_path[-1]) 
-
-    #simplified_path = rdp_simplify_safe(simplified_path, grid=None, epsilon=2.0)
     
     return simplified_path
 
-def rdp_simplify_safe(path, grid, epsilon=2.0):
       """RDP that only removes points if path stays obstacle-free."""
       if len(path) < 3:
           return path
