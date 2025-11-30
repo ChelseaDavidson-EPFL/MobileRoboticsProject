@@ -1,10 +1,17 @@
 # ============================================================
+#  Constants
+# ============================================================
+GRID_DIM = 200
+ROBOT_H = 20            # Robot height in cm (Thymio)
+ROBOT_W = 20            # Robot width in cm (Thymio)
+
+ 
+# # ============================================================
 #  GLOBAL VARIABLES (accessible by all files)
 # ============================================================
-grid_dim = 200          # Grid is always 200x200 cells
+          # Grid is always 200x200 cells
 cell_size_cm = None     # Set by vision after arena detection
-robot_h = 11            # Robot height in cm (Thymio)
-robot_w = 11            # Robot width in cm (Thymio)
+
 arena_width_cm = None   # Set by vision after arena detection
 arena_height_cm = None  # Set by vision after arena detection
 
@@ -29,10 +36,10 @@ def real_to_grid(coord):
     """
     x_cm, y_cm = coord
     col = int(x_cm / cell_size_cm)
-    row = grid_dim - 1 - int(y_cm / cell_size_cm)  # Flip y-axis
+    row = GRID_DIM - 1 - int(y_cm / cell_size_cm)  # Flip y-axis
     # Clamp to valid range
-    row = max(0, min(grid_dim - 1, row))
-    col = max(0, min(grid_dim - 1, col))
+    row = max(0, min(GRID_DIM - 1, row))
+    col = max(0, min(GRID_DIM - 1, col))
     return (row, col)
 
 def grid_to_real(coord):
@@ -42,5 +49,5 @@ def grid_to_real(coord):
     """
     row, col = coord
     x_cm = (col + 0.5) * cell_size_cm
-    y_cm = (grid_dim - 1 - row + 0.5) * cell_size_cm
+    y_cm = (GRID_DIM - 1 - row + 0.5) * cell_size_cm
     return (x_cm, y_cm)

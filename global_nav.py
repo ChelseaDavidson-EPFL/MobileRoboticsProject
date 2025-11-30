@@ -7,7 +7,7 @@ import utils
 
 # ============================================================
 #  Use globals from utils:
-#  - utils.grid_dim, utils.cell_size_cm, utils.robot_h, utils.robot_w
+#  - utils.GRID_DIM, utils.cell_size_cm, utils.ROBOT_H, utils.ROBOT_W
 #  - utils.arena_width_cm, utils.arena_height_cm
 #  - utils.real_to_grid(), utils.grid_to_real()
 # ============================================================
@@ -29,12 +29,12 @@ def heuristic(a, b):
 # ============================================================
 def is_robot_valid(map_grid, cx, cy):
     """
-    Checks whether a robot of size robot_h × robot_w centered at (cx, cy)
+    Checks whether a robot of size ROBOT_H × ROBOT_W centered at (cx, cy)
     fits entirely inside free space. Uses robot dimensions from utils.
     """
     # Get robot size in cells
-    robot_h_cells = utils.cm_to_cell(utils.robot_h)
-    robot_w_cells = utils.cm_to_cell(utils.robot_w)
+    robot_h_cells = utils.cm_to_cell(utils.ROBOT_H)
+    robot_w_cells = utils.cm_to_cell(utils.ROBOT_W)
 
     # cx is row index (y), cy is column index (x)
     half_h = robot_h_cells // 2
@@ -113,8 +113,8 @@ def display_map(map_grid, path, simplified_path, start, goal):
     plt.title("Pathfinding | Full Path & Simplified Waypoints")
 
     # Draw robot footprint at each path cell
-    robot_h_cells = utils.cm_to_cell(utils.robot_h)
-    robot_w_cells = utils.cm_to_cell(utils.robot_w)
+    robot_h_cells = utils.cm_to_cell(utils.ROBOT_H)
+    robot_w_cells = utils.cm_to_cell(utils.ROBOT_W)
     half_h = robot_h_cells / 2
     half_w = robot_w_cells / 2
 
@@ -310,7 +310,7 @@ def expanded_dijkstra(grid, start, goal):
         expanded_grid: the occupancy grid with expanded obstacles
     """
     # Get robot size in cells
-    robot_size_cells = utils.cm_to_cell(max(utils.robot_h, utils.robot_w))
+    robot_size_cells = utils.cm_to_cell(max(utils.ROBOT_H, utils.ROBOT_W))
 
     # Expand obstacles by robot size using cv2 dilation
     expanded_grid = expand_grid_by_robot(grid, robot_size_cells)

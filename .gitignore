@@ -3,3 +3,4 @@ __pycache__
 *.pyc
 vision_general_fns.py
 vision_for_filtering_tests.py
+sensorTests.py.DS_Store
