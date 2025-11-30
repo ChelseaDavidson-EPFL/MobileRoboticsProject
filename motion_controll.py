@@ -30,6 +30,10 @@ def follow_path(thym: Thymio, next_goal):
     # angle_goal: 0=X+, π/2=Y+, -π/2=Y-, π=X-
     angle_goal = math.atan2(dy, dx)
     diff_angle = angle_goal - thym.orient
+    if(diff_angle>math.pi):
+        diff_angle -= 2*math.pi
+    if(diff_angle<-math.pi):
+        diff_angle += 2*math.pi
 
     print(f"pos: [{thym.pos[0]:.1f}, {thym.pos[1]:.1f}], goal: [{next_goal[0]:.1f}, {next_goal[1]:.1f}], dist: {dist_goal:.2f}, angle_goal: {angle_goal:.2f}, orient: {thym.orient:.2f}, diff: {diff_angle:.2f}")
 
