@@ -425,14 +425,14 @@ class Vision:
 
         # No markers at all
         if ids is None:
-            return None, None, None, None
+            return None, None, None
 
         # Convert ids to a simple list
         ids = ids.flatten()
 
         # Check if goalID exists
         if goalId not in ids:
-            return None, None, None, None
+            return None, None, None
 
         # Find index of ID goalId
         idx = list(ids).index(goalId)
