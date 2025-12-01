@@ -19,18 +19,22 @@ def kallman(x_est_prev, P_est_prev, v, omega, Q, Ts, pos_meas, R):     #x = [x, 
 
     P_est_a_priori = np.dot(F, np.dot(P_est_prev, F.T)) + Q
  
-    y = np.array([pos_meas[0], pos_meas[1]])
+    if pos_meas==None:
+        return x_est_a_priori, P_est_a_priori
 
-    H = np.array([[1, 0, 0, 0],
-                  [0, 1, 0, 0]])
+    else:
+        y = np.array([pos_meas[0], pos_meas[1]])
 
-    i = y-np.dot(H, x_est_a_priori)
-    S = np.dot(H, np.dot(P_est_a_priori, H.T)) + R
-    K = np.dot(P_est_a_priori, np.dot(H.T, np.linalg.inv(S)))
+        H = np.array([[1, 0, 0, 0],
+                    [0, 1, 0, 0]])
 
-    x_est = x_est_a_priori + np.dot(K, i)
-    P_est = P_est_a_priori - np.dot(K, np.dot(H, P_est_a_priori))
-    return x_est, P_est
+        i = y-np.dot(H, x_est_a_priori)
+        S = np.dot(H, np.dot(P_est_a_priori, H.T)) + R
+        K = np.dot(P_est_a_priori, np.dot(H.T, np.linalg.inv(S)))
+
+        x_est = x_est_a_priori + np.dot(K, i)
+        P_est = P_est_a_priori - np.dot(K, np.dot(H, P_est_a_priori))
+        return x_est, P_est
 
 
 ############################################################
@@ -62,14 +66,15 @@ def init_filter(q_x, q_y, q_theta, q_v, r_x, r_y, initial_pos=None): #initial_po
 #########################################################
 
 def filter_pos(thym: Thymio, pos_on_img, orient_on_img, x_est, P_est, Q, R, Ts, RATIO_SPEED):
-    #thym.pos = pos_on_img
-    #thym.orient = orient_on_img
+    thym.pos = pos_on_img
+    thym.orient = orient_on_img
     motor_speed=thym.motor_speeds
     v = (motor_speed[0]+motor_speed[1])/2
     omega = (motor_speed[0]-motor_speed[1])/(RATIO_SPEED*DISTANCE_WHEELS)
     new_x_est, new_P_est = kallman(x_est, P_est, v, omega, Q, Ts, pos_on_img, R)
 
     return new_x_est, new_P_est
+
 
 
 # 1. Initialize filter
