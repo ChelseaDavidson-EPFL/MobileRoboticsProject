@@ -384,35 +384,6 @@ def simplify_path(full_path):
     
     return simplified_path
 
-      """RDP that only removes points if path stays obstacle-free."""
-      if len(path) < 3:
-          return path
-
-      start, end = np.array(path[0]), np.array(path[-1])
-      line_vec = end - start
-      line_len = np.linalg.norm(line_vec)
-
-      if line_len == 0:
-          return [path[0], path[-1]]
-
-      # Find max distance point
-      max_dist = 0
-      max_idx = 0
-      for i in range(1, len(path) - 1):
-          point = np.array(path[i])
-          dist = np.abs(np.cross(line_vec, start - point)) / line_len
-          if dist > max_dist:
-              max_dist = dist
-              max_idx = i
-
-      # If close enough AND line-of-sight is clear, simplify
-      if max_dist <= epsilon and line_of_sight(grid, path[0], path[-1]):
-          return [path[0], path[-1]]
-      else:
-          left = rdp_simplify_safe(path[:max_idx + 1], grid, epsilon)
-          right = rdp_simplify_safe(path[max_idx:], grid, epsilon)
-          return left[:-1] + right
-
 # ============================================================
 #  EXECUTION 
 # ============================================================
@@ -427,9 +398,9 @@ def find_path(mode, grid, start, goal):
         start: (row, col) start position
         goal: (row, col) goal position
     """
-    if mode == 'a_star':
+    if mode == 1:
         path, expanded_grid = expanded_a_star(grid, start, goal)
-    elif mode == 'dijkstra':
+    elif mode == 0:
         path, expanded_grid = expanded_dijkstra(grid, start, goal)
     else:
         raise ValueError("Invalid mode. Choose 'a_star' or 'dijkstra'.")
@@ -442,6 +413,7 @@ def find_path(mode, grid, start, goal):
         print(f"Simplified Path (in grid): {simplified_path}")
         converted_simplified_path = [utils.grid_to_real(p) for p in simplified_path]
         print("Simplified Path Waypoints (real cm):", converted_simplified_path)
+        real_waypts = [[float(wp[0]), float(wp[1])] for wp in converted_simplified_path]
         print("------------------------------")
 
         display_map(grid, path, simplified_path, start, goal)
@@ -449,5 +421,5 @@ def find_path(mode, grid, start, goal):
         simplified_path = None
         print("No path found.")
 
-    return simplified_path, expanded_grid
+    return real_waypts, expanded_grid
 
