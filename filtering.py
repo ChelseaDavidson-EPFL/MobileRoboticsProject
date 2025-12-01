@@ -12,8 +12,8 @@ def kallman(x_est_prev, P_est_prev, v, omega, Q, Ts, pos_meas, R):     #x = [x, 
     x_est_a_priori = np.array([x_next, y_next, theta_next, v_next])
 
     #jacobian (derivatives of states)
-    F = np.array([[1, 0, -v*np.sin(x_est_a_priori[2])*Ts,  np.cos(x_est_a_priori[2])*Ts],
-                  [0, 1,  v*np.cos(x_est_a_priori[2])*Ts,  np.sin(x_est_a_priori[2])*Ts],
+    F = np.array([[1, 0, -v*np.sin(x_est_prev[2])*Ts,  np.cos(x_est_prev[2])*Ts],
+                  [0, 1,  v*np.cos(x_est_prev[2])*Ts,  np.sin(x_est_prev[2])*Ts],
                   [0, 0, 1, 0],
                   [0, 0, 0, 1]])
 
@@ -34,6 +34,7 @@ def kallman(x_est_prev, P_est_prev, v, omega, Q, Ts, pos_meas, R):     #x = [x, 
 
         x_est = x_est_a_priori + np.dot(K, i)
         P_est = P_est_a_priori - np.dot(K, np.dot(H, P_est_a_priori))
+        #P_est = (np.eye(4) - K @ H) @ P_est_a_priori @ (np.eye(4) - K @ H).T + K @ R @ K.T
         return x_est, P_est
 
 
