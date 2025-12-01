@@ -408,13 +408,13 @@ def find_path(mode, grid, start, goal):
     if path:
         simplified_path = simplify_path(path)
     
-        print("--- Pathfinding Results ---")
-        print(f"Start: {start}, Goal: {goal}")
-        print(f"Simplified Path (in grid): {simplified_path}")
+        # print("--- Pathfinding Results ---")
+        # print(f"Start: {start}, Goal: {goal}")
+        # print(f"Simplified Path (in grid): {simplified_path}")
         converted_simplified_path = [utils.grid_to_real(p) for p in simplified_path]
-        print("Simplified Path Waypoints (real cm):", converted_simplified_path)
+        # print("Simplified Path Waypoints (real cm):", converted_simplified_path)
         real_waypts = [[float(wp[0]), float(wp[1])] for wp in converted_simplified_path]
-        print("------------------------------")
+        # print("------------------------------")
 
         display_map(grid, path, simplified_path, start, goal)
     else:
