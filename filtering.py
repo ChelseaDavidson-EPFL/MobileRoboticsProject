@@ -1,7 +1,7 @@
 from thymio import Thymio
 import numpy as np
 
-DISTANCE_WHEELS = 95 #in mm
+DISTANCE_WHEELS = 9.5 #in cm
 
 def kallman(x_est_prev, P_est_prev, v, omega, Q, Ts, pos_meas, R):     #x = [x, y, theta, velocity]
     x_next = x_est_prev[0]+v*np.cos(x_est_prev[2])*Ts
@@ -19,7 +19,7 @@ def kallman(x_est_prev, P_est_prev, v, omega, Q, Ts, pos_meas, R):     #x = [x, 
 
     P_est_a_priori = np.dot(F, np.dot(P_est_prev, F.T)) + Q
  
-    if pos_meas==None:
+    if pos_meas is None:
         return x_est_a_priori, P_est_a_priori
 
     else:
@@ -44,11 +44,11 @@ def kallman(x_est_prev, P_est_prev, v, omega, Q, Ts, pos_meas, R):     #x = [x, 
 #                                                          #
 ############################################################
 
-def init_filter(q_x, q_y, q_theta, q_v, r_x, r_y, initial_pos=None): #initial_pos = [x, y, orient]
-    if initial_pos is None:
+def init_filter(q_x, q_y, q_theta, q_v, r_x, r_y, initial_pos=None, initial_orient=None): #initial_pos = [x, y, orient]
+    if initial_pos is None or initial_orient is None:
         x_est = np.array([0., 0., 0., 0.])
     else:
-        x_est = np.array([initial_pos[0], initial_pos[1], initial_pos[2], 0.])
+        x_est = np.array([initial_pos[0], initial_pos[1], initial_orient, 0.])
     P_est = 1000 * np.eye(4)
     Q=np.array([[q_x, 0, 0, 0],
                 [0, q_y, 0, 0],
@@ -66,9 +66,9 @@ def init_filter(q_x, q_y, q_theta, q_v, r_x, r_y, initial_pos=None): #initial_po
 #                                                       #
 #########################################################
 
-def filter_pos(thym: Thymio, pos_on_img, orient_on_img, x_est, P_est, Q, R, Ts, RATIO_SPEED):
-    thym.pos = pos_on_img
-    thym.orient = orient_on_img
+def filter_pos(thym: Thymio, pos_on_img, x_est, P_est, Q, R, Ts, RATIO_SPEED):
+    #thym.pos = pos_on_img
+    #thym.orient = orient_on_img
     motor_speed=thym.motor_speeds
     v = (motor_speed[0]+motor_speed[1])/2
     omega = (motor_speed[0]-motor_speed[1])/(RATIO_SPEED*DISTANCE_WHEELS)
