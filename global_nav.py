@@ -4,6 +4,7 @@ from matplotlib.colors import ListedColormap
 from matplotlib.path import Path # Used for robust grid creation
 from heapq import heappush, heappop
 import utils
+import cv2
 
 
 # ============================================================
@@ -152,7 +153,6 @@ def display_grid(map_grid, start=None, goal=None):
 # ============================================================
 #  GRID EXPANSION using cv2 dilation (for expanded_dijkstra)
 # ============================================================
-import cv2
 
 def expand_grid_by_robot(grid, robot_size_cells, safety_margin=0):
     """
