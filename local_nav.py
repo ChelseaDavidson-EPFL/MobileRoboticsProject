@@ -6,7 +6,7 @@ import math
 GLOBAL_IR_THLD = 5000
 LOCAL_IR_THLD = 2000
 
-K_AVOID  = 500
+K_AVOID  = 200
 K_BREAK = 1200
 FWD_SPEED = 100
 MAX_IR_VAL = 5000
@@ -81,9 +81,9 @@ def avoid_obstacle(thym: Thymio, grid, avoid_right: bool):
 
     if(fwd_speed == 0 and right_sum == 0 and left_sum == 0):
         if(avoid_right):
-            left_sum = 2000
+            left_sum = 1000
         else:
-            right_sum = 2000
+            right_sum = 1000
         
 
     if(left_sum > right_sum):
