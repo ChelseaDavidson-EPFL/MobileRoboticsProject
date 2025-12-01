@@ -11,7 +11,7 @@ ROT_SPEED = 30
 # angle at witch it starts to go forward
 MAX_ANGLE = 0.5
 # Astolfi angle gain
-K_ASTOL = 9000
+K_ASTOL = 4000
 # Distance between the center of the tymio and the wheels
 DIST_TO_WHEELS = 0.0475
 
@@ -35,7 +35,7 @@ def follow_path(thym: Thymio, next_goal):
     if(diff_angle<-math.pi):
         diff_angle += 2*math.pi
 
-    print(f"pos: [{thym.pos[0]:.1f}, {thym.pos[1]:.1f}], goal: [{next_goal[0]:.1f}, {next_goal[1]:.1f}], dist: {dist_goal:.2f}, angle_goal: {angle_goal:.2f}, orient: {thym.orient:.2f}, diff: {diff_angle:.2f}")
+    # print(f"pos: [{thym.pos[0]:.1f}, {thym.pos[1]:.1f}], goal: [{next_goal[0]:.1f}, {next_goal[1]:.1f}], dist: {dist_goal:.2f}, angle_goal: {angle_goal:.2f}, orient: {thym.orient:.2f}, diff: {diff_angle:.2f}")
 
     if(abs(diff_angle)>MAX_ANGLE):
         if(diff_angle>=0):
