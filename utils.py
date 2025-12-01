@@ -4,6 +4,7 @@
 GRID_DIM = 200
 ROBOT_H = 11            # Robot height in cm (Thymio)
 ROBOT_W = 11            # Robot width in cm (Thymio)
+FREQ_MAIN_LOOP = 20     # Frequency of the main loop (in Hz)
 
  
 # # ============================================================

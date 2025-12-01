@@ -7,9 +7,9 @@ GOAL_RADUIS = 1
 # Forward speed
 FWD_SPEED = 100
 # Rotation speed
-ROT_SPEED = 30
+ROT_SPEED = 20
 # angle at witch it starts to go forward
-MAX_ANGLE = 0.5
+MAX_ANGLE = 0.8
 # Astolfi angle gain
 K_ASTOL = 4000
 # Distance between the center of the tymio and the wheels
