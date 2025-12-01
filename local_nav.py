@@ -1,4 +1,7 @@
 from thymio import Thymio
+import utils
+import numpy as np
+import math
 
 GLOBAL_IR_THLD = 5000
 LOCAL_IR_THLD = 3000
@@ -18,12 +21,53 @@ def is_object(thym: Thymio):
 
 
 def avoid_right(thym: Thymio, grid):
+    """
+    Checks if there are more obstacles to the right or left of the robot.
+    Returns True if the robot should avoid to the right (obstacle on the left).
+    """
+    # Convert Thymio position to grid coordinates
+    pos_cm = (thym.pos[0], thym.pos[1])
+    grid_pos = utils.real_to_grid(pos_cm)
+    row, col = grid_pos
     
-    return True
+    # Determine right/left direction based on robot orientation
+    # orient: 0=right (X+), π/2=up (Y+), -π/2=down (Y-), π=left (X-)
+    orient = thym.orient
+    
+    # Right vector perpendicular to orientation (rotation of -90°)
+    right_dx = int(round(math.sin(orient)))
+    right_dy = int(round(-math.cos(orient)))
+    
+    # Left vector (rotation of +90°)
+    left_dx = -right_dx
+    left_dy = -right_dy
+    
+    # Check cells to the right and left (check distance: 3 cells)
+    check_distance = 3
+    obstacles_right = 0
+    obstacles_left = 0
+    
+    for dist in range(1, check_distance + 1):
+        # Cell to the right
+        right_row = row + right_dx * dist
+        right_col = col + right_dy * dist
+        if 0 <= right_row < grid.shape[0] and 0 <= right_col < grid.shape[1]:
+            if grid[right_row, right_col] == -1:
+                obstacles_right += 1
+        
+        # Cell to the left
+        left_row = row + left_dx * dist
+        left_col = col + left_dy * dist
+        if 0 <= left_row < grid.shape[0] and 0 <= left_col < grid.shape[1]:
+            if grid[left_row, left_col] == -1:
+                obstacles_left += 1
+    
+    # Return True if more obstacles on the left (so avoid to the right)
+    return obstacles_left >= obstacles_right
     
     
 
-def avoid_obstacle(thym: Thymio, grid, path, avoid_right: bool):
+def avoid_obstacle(thym: Thymio, grid, avoid_right: bool):
     ir_sens = thym.ir_sensors
     left_sum = ir_sens[0]+ir_sens[1]
     right_sum = ir_sens[3]+ir_sens[4]
@@ -36,7 +80,7 @@ def avoid_obstacle(thym: Thymio, grid, path, avoid_right: bool):
     speed_R = fwd_speed
 
     if(fwd_speed == 0 and right_sum == 0 and left_sum == 0):
-        if(avoid_right):
+        if(avoid_right(thym, grid)):
             left_sum = 2000
         else:
             right_sum = 2000
