@@ -9,19 +9,20 @@ RATIO_SPEED = 34.675    # from filter computations (wanted speed / mean speed ov
 q_v = 0.300625          # velocity variance for filter
 q_x = 0.00076067        # x position variance for filter
 q_y = 0.00023067        # y position variance for filter
-q_theta = 0.00051989    # angle variance for filter
+q_theta = 0.00051989/2    # angle variance for filter
 r_x = 0.00076067        # x position measurement variande for filter
 r_y = 0.00023067        # y position measurement variande for filter
  
 # # ============================================================
 #  GLOBAL VARIABLES (accessible by all files)
 # ============================================================
-          # Grid is always 200x200 cells
 cell_size_cm = None     # Set by vision after arena detection
 
 arena_width_cm = None   # Set by vision after arena detection
 arena_height_cm = None  # Set by vision after arena detection
 
+
+path_find_mode = 0      # 0 for djikstra, 1 for a*
 # ============================================================
 #  AXIS CONVERSION FUNCTIONS
 #  Grid: (row, col) where row 0 is TOP, row 199 is BOTTOM

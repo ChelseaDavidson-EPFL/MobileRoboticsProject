@@ -3,6 +3,8 @@ import tdmclient.notebook
 from tdmclient import ClientAsync, aw
 import time
 
+MAX_MOTROR_SPEED = 500
+
 
 class Thymio :
     ir_sensors = [0, 0, 0, 0, 0]
@@ -25,12 +27,15 @@ class Thymio :
         self.node = None
         self.pos = pos_init
         self.orient = orient
+        self.last_orient = orient
         self.nav_mode = "GLOBAL"
         self.ir_sensors = [0, 0, 0, 0, 0]
+        self.ground_sensors = [0, 0]  # Ground proximity sensors
         self.motor_speeds = [0, 0]
         self.state = 0
         self._forward_start_time = None
         self._timer_task = None
+        self.is_kidnapped = False  # Kidnapping state
 
         # Button states
         self.button_forward = 0
@@ -51,6 +56,14 @@ class Thymio :
 
     def set_motor_speeds(self, speeds):
         self.node.flush()
+        if(speeds[0]>MAX_MOTROR_SPEED):
+            speeds[0]=MAX_MOTROR_SPEED
+        if(speeds[0]<-MAX_MOTROR_SPEED):
+            speeds[0]=-MAX_MOTROR_SPEED
+        if(speeds[1]>MAX_MOTROR_SPEED):
+            speeds[1]=MAX_MOTROR_SPEED
+        if(speeds[1]<-MAX_MOTROR_SPEED):
+            speeds[1]=-MAX_MOTROR_SPEED
         self.motor_speeds = speeds
         self.node.send_set_variables({"motor.left.target": [speeds[0]], "motor.right.target": [speeds[1]]})
 
@@ -137,3 +150,14 @@ class Thymio :
                     self.set_motor_speeds([0,0])
 
             await asyncio.sleep(self.SAMPLING)
+            
+    async def update_ground_sensors(self):
+        """Read the ground proximity sensors (prox.ground.reflected)"""
+        self.node.flush()
+        await self.node.wait_for_variables({"prox.ground.reflected"})
+        if "prox.ground.reflected" in self.node:
+            self.ground_sensors = list(self.node["prox.ground.reflected"])
+
+    def get_ground_sensors(self):
+        """Return current ground sensor values"""
+        return self.ground_sensors

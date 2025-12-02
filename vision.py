@@ -58,10 +58,10 @@ class Vision:
             sys.exit()
         
         # Set camera properties for faster capture
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)  # Lower resolution = faster
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        self.cap.set(cv2.CAP_PROP_FPS, 30)  # Explicitly set FPS
-        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Reduce buffer
+        # self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)  # Lower resolution = faster
+        # self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        # self.cap.set(cv2.CAP_PROP_FPS, 30)  # Explicitly set FPS
+        # self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Reduce buffer
 
         waitNumber = 30
         waitIndx = 0
@@ -425,14 +425,14 @@ class Vision:
 
         # No markers at all
         if ids is None:
-            return None, None, None, None
+            return None, None, None
 
         # Convert ids to a simple list
         ids = ids.flatten()
 
         # Check if goalID exists
         if goalId not in ids:
-            return None, None, None, None
+            return None, None, None
 
         # Find index of ID goalId
         idx = list(ids).index(goalId)
