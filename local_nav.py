@@ -9,7 +9,9 @@ LOCAL_IR_THLD = 2000
 K_AVOID  = 200
 K_BREAK = 1200
 FWD_SPEED = 100
+ROT_SPEED = 20
 MAX_IR_VAL = 5000
+DIS_THLD = 2000
 
 
 def is_object(thym: Thymio):
@@ -67,29 +69,47 @@ def avoid_right(thym: Thymio, grid):
     
     
 
-def avoid_obstacle(thym: Thymio, grid, avoid_right: bool):
+def avoid_obstacle(thym: Thymio, avoid_right: bool, start_angle, last_angle):
     ir_sens = thym.ir_sensors
-    left_sum = ir_sens[0]+ir_sens[1]
-    right_sum = ir_sens[3]+ir_sens[4]
-    fwd_speed = int(FWD_SPEED - K_BREAK*((ir_sens[1]+ir_sens[2]+ir_sens[3])/3*MAX_IR_VAL))
+    last_angle = thym.last_orient
+    if(avoid_right):
+        if(ir_sens[0]==0 and sum(ir_sens[1:5])>0):
+            thym.set_motor_speeds([ROT_SPEED, -ROT_SPEED])
+        else :
+            thym.set_motor_speeds([int(FWD_SPEED - K_AVOID*(ir_sens[0]-DIS_THLD)), FWD_SPEED])
+    else:
+        if(ir_sens[4]==0 and sum(ir_sens[0:4])>0):
+            thym.set_motor_speeds([-ROT_SPEED, ROT_SPEED])
+        else :
+            thym.set_motor_speeds([FWD_SPEED, int(FWD_SPEED - K_AVOID*(ir_sens[4]-DIS_THLD))])
 
-    if(fwd_speed<=0): 
-        fwd_speed = 0
+    if(abs(thym.orient - start_angle) > math.pi/4):
+        return True
+    return False
+
+# def avoid_obstacle(thym: Thymio, grid, avoid_right: bool):
+#     ir_sens = thym.ir_sensors
+#     left_sum = ir_sens[0]+ir_sens[1]
+#     right_sum = ir_sens[3]+ir_sens[4]
+#     fwd_speed = int(FWD_SPEED - K_BREAK*((ir_sens[1]+ir_sens[2]+ir_sens[3])/3*MAX_IR_VAL))
+
+#     if(fwd_speed<=0): 
+#         fwd_speed = 0
             
-    speed_L = fwd_speed
-    speed_R = fwd_speed
+#     speed_L = fwd_speed
+#     speed_R = fwd_speed
 
-    if(fwd_speed == 0 and right_sum == 0 and left_sum == 0):
-        if(avoid_right):
-            left_sum = 1000
-        else:
-            right_sum = 1000
+#     if(fwd_speed == 0 and right_sum == 0 and left_sum == 0):
+#         if(avoid_right):
+#             left_sum = 1000
+#         else:
+#             right_sum = 1000
         
 
-    if(left_sum > right_sum):
-        speed_R = int(speed_R - (left_sum/MAX_IR_VAL)*K_AVOID)      
-    else: 
-        speed_L = int(speed_L - (right_sum/MAX_IR_VAL)*K_AVOID) 
+#     if(left_sum > right_sum):
+#         speed_R = int(speed_R - (left_sum/MAX_IR_VAL)*K_AVOID)      
+#     else: 
+#         speed_L = int(speed_L - (right_sum/MAX_IR_VAL)*K_AVOID) 
         
-    thym.set_motor_speeds([speed_L, speed_R])
-    return
+#     thym.set_motor_speeds([speed_L, speed_R])
+#     return

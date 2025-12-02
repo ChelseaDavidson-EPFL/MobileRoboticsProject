@@ -25,6 +25,7 @@ class Thymio :
         self.node = None
         self.pos = pos_init
         self.orient = orient
+        self.last_orient = orient
         self.nav_mode = "GLOBAL"
         self.ir_sensors = [0, 0, 0, 0, 0]
         self.motor_speeds = [0, 0]
