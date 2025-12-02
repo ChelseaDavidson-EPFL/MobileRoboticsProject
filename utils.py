@@ -4,7 +4,15 @@
 GRID_DIM = 200
 ROBOT_H = 11            # Robot height in cm (Thymio)
 ROBOT_W = 11            # Robot width in cm (Thymio)
-
+FREQ_MAIN_LOOP = 20     # Frequency of the main loop (in Hz)
+RATIO_SPEED = 34.675    # from filter computations (wanted speed / mean speed over 10 runs)
+q_v = 0.300625          # velocity variance for filter
+q_x = 0.00076067        # x position variance for filter
+q_y = 0.00023067        # y position variance for filter
+q_theta = 0.00051989/2    # angle variance for filter
+r_x = 0.00076067        # x position measurement variande for filter
+r_y = 0.00023067        # y position measurement variande for filter
+ 
 # # ============================================================
 #  GLOBAL VARIABLES (accessible by all files)
 # ============================================================

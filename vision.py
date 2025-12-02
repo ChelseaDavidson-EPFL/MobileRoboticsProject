@@ -24,6 +24,7 @@ class Vision:
         self.grid_dim = utils.GRID_DIM
         self.arenaMarkerDict = cv2.aruco.DICT_4X4_50
         self.robotMarkerDict = cv2.aruco.DICT_5X5_50
+        self.goalMarkerDict = cv2.aruco.DICT_5X5_50
 
         # Arena information
         self.arena_corners_pixels = None
@@ -35,8 +36,13 @@ class Vision:
         self.cell_size_cm = None
 
         # Robot initial pose (stored during getEnvironment)
-        self.initial_robot_pos = None  # (X, Y) in meters
+        self.initial_robot_pos = None  # (X, Y) in meters relative to left bottom corner of arena
         self.initial_robot_orient = None  # heading in radians
+
+        # Goal position (stored during getEnvironment)
+        self.goal_pos = None # (x, y) in meters relative to left bottom corner of arena
+        self.goal_cam_pos = None # (x, y) in camera frame
+        self.goal_marker_corners = None # corners in camera frame
 
         # Store video capture
         self.cap = None
@@ -100,19 +106,28 @@ class Vision:
             # ----------------------------
             polygons = self.locateObstaclesRed(frame)
             global_polygons = self.convertPolygonsToWorld(polygons)
+
+            # ----------------------------
+            # 5. Find and store goal position
+            # ----------------------------
+            self.goal_pos, self.goal_cam_pos, self.goal_marker_corners = self.findGoalPos(frame)
+            if (self.goal_pos is None or self.goal_cam_pos is None or self.goal_marker_corners is None):
+                print("Couldn't locate goal")
+                continue
             
             # ----------------------------
-            # 5. Create and store occupancy grid
+            # 6. Create and store occupancy grid
             # ----------------------------
             self.createGrid(self.arena_width_m, self.arena_height_m, global_polygons)
  
             # ----------------------------
-            # 6. Visualisations
+            # 7. Visualisations
             # ----------------------------
 
             self.visualiseArena(vis, self.arena_corners_pixels)
             self.visualiseRobotPose(vis, robot_marker_corners, robot_cam_x, robot_cam_y, robot_heading_angle, X, Y)
             self.visualiseObstacles(vis, polygons)
+            self.visualiseGoalPos(vis, self.goal_marker_corners, self.goal_cam_pos[0], self.goal_cam_pos[1], self.goal_pos[0], self.goal_pos[1])
             break
         
         # Show the result (auto-closes after 3 seconds to avoid Jupyter kernel crash)
@@ -175,6 +190,12 @@ class Vision:
     def getInitialRobotPose(self):
         """Returns the robot pose detected during initialization: ((X, Y) in meters, heading in radians)"""
         return self.initial_robot_pos, self.initial_robot_orient
+    
+    def getGoalPos(self):
+        return self.goal_pos
+    
+    def getGoalPosRealAndCamera(self):
+        return self.goal_pos, self.goal_cam_pos, self.goal_marker_corners
 
     def display_grid(self, start_cell=None, goal_cell=None):
         map_grid = self.grid
@@ -295,6 +316,20 @@ class Vision:
 
         return pixel_corners, arena_width_m, arena_height_m, meters_per_pixel
     
+    def findGoalPos(self, image):
+        # Get robot pose in camera frame
+        goal_cam_x, goal_cam_y, goal_marker_corners = self.getGoalPosCameraFrame(image)
+
+        if (goal_cam_x is None or goal_cam_y is None or goal_marker_corners is None):
+            print("Couldn't locate goal position so exiting find goal function")
+            return None, None, None
+
+        # Convert to global coordinates
+        X, Y = self.getGlobalLocation(goal_cam_x, goal_cam_y)
+
+        return (X, Y), (goal_cam_x, goal_cam_y), goal_marker_corners
+
+    
     def getRobotPose(self, image):
         # Get robot pose in camera frame
         robot_cam_x, robot_cam_y, robot_heading_angle, robot_marker_corners = self.getRobotPoseCameraFrame(image)
@@ -369,6 +404,47 @@ class Vision:
         heading_angle = np.arctan2(-dir_vec[1], dir_vec[0])  # (radians) NOTE: do negative of y since camera y is top bottom not bottom top 
 
         return cx, cy, heading_angle, robotCorners
+    
+    def getGoalPosCameraFrame(self, image):
+        """
+        Detects ONLY ArUco marker with ID 3.
+        Returns:
+        - center pixel (cx, cy)
+        - 4 corner points (TL, TR, BR, BL)
+        """
+        # Goal Aruco ID
+        goalId = 3
+
+        # Dictionary for aruco markers
+        aruco_dict = cv2.aruco.getPredefinedDictionary(self.goalMarkerDict)
+        detector = cv2.aruco.ArucoDetector(aruco_dict, cv2.aruco.DetectorParameters())
+
+        # Convert to gray scale for better detection
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        corners, ids, _ = detector.detectMarkers(gray)
+
+        # No markers at all
+        if ids is None:
+            return None, None, None
+
+        # Convert ids to a simple list
+        ids = ids.flatten()
+
+        # Check if goalID exists
+        if goalId not in ids:
+            return None, None, None
+
+        # Find index of ID goalId
+        idx = list(ids).index(goalId)
+
+        # Get its corners
+        goalCorners = corners[idx][0]  # shape (4,2)
+
+        # Find center pixel of the marker
+        cx = int(goalCorners[:, 0].mean())
+        cy = int(goalCorners[:, 1].mean())
+
+        return cx, cy, goalCorners
 
     def computeHomography(self, arena_corners_pixels, arena_width_m, arena_height_m):
         """
@@ -526,6 +602,20 @@ class Vision:
         coord_text = f"({robot_center_world_x:.5f}m, {robot_center_world_y:.5f}m)"
         cv2.putText(vis, coord_text, (robot_center_cam_x + 15, robot_center_cam_y),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+        
+    def visualiseGoalPos(self, vis, goal_marker_corners, goal_center_cam_x, goal_center_cam_y, goal_center_world_x, goal_center_world_y):
+         # Draw ArUco marker location
+        int_corners = goal_marker_corners.astype(np.int32)
+        cv2.polylines(vis, [int_corners], True, (255, 0, 0), 3)
+
+        # Draw center point
+        cv2.circle(vis, (goal_center_cam_x, goal_center_cam_y), 6, (0, 0, 255), -1)
+
+        # Label with global coordinate
+        coord_text = f"({goal_center_world_x:.5f}m, {goal_center_world_y:.5f}m)"
+        cv2.putText(vis, coord_text, (goal_center_cam_x + 15, goal_center_cam_y),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+
 
     def visualiseObstacles(self, vis, polygons):
         # Outline obstacles
