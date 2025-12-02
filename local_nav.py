@@ -69,7 +69,7 @@ def avoid_right(thym: Thymio, grid):
     
     
 
-def avoid_obstacle(thym: Thymio, avoid_right: bool, start_angle, last_angle):
+def avoid_obstacle(thym: Thymio, avoid_right: bool, start_angle):
     ir_sens = thym.ir_sensors
     last_angle = thym.last_orient
     if(avoid_right):
