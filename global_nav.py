@@ -22,28 +22,20 @@ def heuristic(a, b):
 # ============================================================
 def display_map(map_grid, path, simplified_path, start, goal):
     # Define colors for the grid
-    cmap = ListedColormap(['white', 'black', 'blue', 'green', 'red'])
+    cmap = ListedColormap(['white', 'blue', 'red'])
     map_display = np.zeros_like(map_grid, dtype=object)
 
     # Colors
     map_display[map_grid == -1] = 'red'  # Obstacle
     map_display[map_grid == 0] = 'white'   # Free Space
 
-    # Explored cells (only mark if it was free space)
-    """ for position in explored:
-        if map_display[position] == 'white':
-            map_display[position] = 'grey' """
-
     # Path
     for position in path:
         if map_display[position] in 'white':
             map_display[position] = 'blue'
 
-    
-
     # Convert color names to numbers
-    color_mapping = {'white': 0, 'black': 1, 'blue': 2,
-                     'green': 3, 'red': 4, 'grey': 5}
+    color_mapping = {'white': 0, 'blue': 1, 'red': 2}
     map_numeric_display = np.vectorize(color_mapping.get)(map_display)
 
     # Show map 
@@ -64,7 +56,7 @@ def display_map(map_grid, path, simplified_path, start, goal):
     # Grid lines
     ax.set_xticks(np.arange(-0.5, map_grid.shape[1], 1), minor=True)
     ax.set_yticks(np.arange(-0.5, map_grid.shape[0], 1), minor=True)
-    ax.grid(which='minor', color='gray', linestyle='-', linewidth=0.15)
+    ax.grid(which='minor', color='grey', linestyle='-', linewidth=0.15)
     plt.title("Pathfinding | Full Path & Simplified Waypoints")
 
     # Draw robot footprint at each path cell
