@@ -4,6 +4,7 @@ import sys
 from matplotlib.path import Path
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
+from shapely.geometry import Polygon
 import utils
 
 """
@@ -33,6 +34,7 @@ class Vision:
 
         self.meters_per_pixel = None
         self.grid = None
+        self.expanded_grid = None
         self.cell_size_cm = None
 
         # Robot initial pose (stored during getEnvironment)
@@ -119,7 +121,8 @@ class Vision:
             # 6. Create and store occupancy grid
             # ----------------------------
             self.createGrid(self.arena_width_m, self.arena_height_m, global_polygons)
- 
+            self.createExpandedGrid(self.arena_width_m, self.arena_height_m, global_polygons)
+
             # ----------------------------
             # 7. Visualisations
             # ----------------------------
@@ -137,8 +140,8 @@ class Vision:
 
     def createGrid(self, arena_w, arena_h, obstacles):
         """
-        Creates a grid in world frame coordinates where the bottom left corner of the arena is 0,0 so the top right corner
-        will be arena_w, arena_h. Both the robot position and obstacle_polygons are relative to this 0,0 frame. The grid has (0=free, -1=obstacle) using matplotlib.path.Path.
+       Creates a grid in world frame coordinates where the bottom left corner of the arena is 0,0 so the top right corner
+       will be arena_w, arena_h. Both the robot position and obstacle_polygons are relative to this 0,0 frame. The grid has (0=free, -1=obstacle) using matplotlib.path.Path.
         """
         self.cell_size_cm = (arena_w/self.grid_dim)*100
         cell_size_m = self.cell_size_cm/100
@@ -180,9 +183,96 @@ class Vision:
         occupancy_grid = np.flipud(occupancy_grid)
         
         self.grid = occupancy_grid
+    
+    def expand_obstacles_shapely(self, obstacles_list, robot_radius, safety_margin=0.0):
+        """
+        Expands the list of obstacle polygons in continuous space using Shapely.
+
+        Args:
+            obstacles_list (list): List of NumPy arrays, each defining a polygon's vertices.
+            robot_radius (float): Half of the robot's size (in meters).
+            safety_margin (float): Additional safety distance (in meters).
+
+        Returns:
+            list: A list of Shapely Polygon/MultiPolygon objects representing the expanded obstacles.
+        """
+        
+        # Calculate the total distance for expansion
+        buffer_distance = robot_radius + safety_margin 
+        
+        # We use a round join style to simulate a robot's circular footprint
+        # join_style=1 (ROUND) is generally best for path planning safety.
+        expanded_polygons = []
+        
+        for poly_verts in obstacles_list:
+            # Reshape the NumPy array into a simple list of (N, 2) coordinates
+            verts = poly_verts.reshape(-1, 2)
+            
+            # Create a Shapely Polygon
+            shapely_poly = Polygon(verts)
+            
+            # Apply the buffer (offset) operation
+            expanded_poly = shapely_poly.buffer(buffer_distance, 
+                                                join_style=1, # 1 for ROUND corners
+                                                mitre_limit=1.0) 
+            expanded_polygons.append(expanded_poly)
+
+        return expanded_polygons
+
+    def createExpandedGrid(self, arena_w, arena_h, global_polygons):
+        robot_radius = max(utils.ROBOT_H, utils.ROBOT_W) / 100 / 2  # cm→m, half size
+        expanded_obstacles = self.expand_obstacles_shapely(global_polygons, robot_radius, safety_margin=0.02)
+           
+        self.cell_size_cm = (arena_w/self.grid_dim)*100
+        cell_size_m = self.cell_size_cm/100
+
+        # Set global variables in utils
+        utils.cell_size_cm = self.cell_size_cm
+        utils.arena_width_cm = arena_w * 100  # Convert m to cm
+        utils.arena_height_cm = arena_h * 100  # Convert m to cm
+        grid = np.zeros((self.grid_dim, self.grid_dim), dtype=np.int8) # Use -1 for obstacles
+
+        # Create a meshgrid of all cell centers in meters
+        x_coords = np.linspace(0.5 * cell_size_m, arena_w - 0.5 * cell_size_m, self.grid_dim)
+        y_coords = np.linspace(0.5 * cell_size_m, arena_w - 0.5 * cell_size_m, self.grid_dim)
+        
+        # Array of all (x, y) points corresponding to cell centers
+        X, Y = np.meshgrid(x_coords, y_coords)
+        points = np.vstack((X.flatten(), Y.flatten())).T
+
+        occupied_indices = np.zeros(self.grid_dim * self.grid_dim, dtype=bool)
+
+        for polygon in expanded_obstacles:
+            # Get the vertices for matplotlib Path (Shapely's .exterior.coords)
+            if polygon.geom_type == 'Polygon':
+                verts = np.array(polygon.exterior.coords)
+                poly_path = Path(verts)
+                contained = poly_path.contains_points(points, radius=0)
+                occupied_indices = occupied_indices | contained
+            elif polygon.geom_type == 'MultiPolygon':
+                # Handle cases where buffering might split the polygon
+                # Iterate through the sub-polygons
+                for sub_poly in polygon.geoms:
+                    verts = np.array(sub_poly.exterior.coords)
+                    poly_path = Path(verts)
+                    contained = poly_path.contains_points(points, radius=0)
+                    occupied_indices = occupied_indices | contained
+
+        # Map Occupancy back to the 2D Grid
+        # True -> -1 (Obstacle), False -> 0 (Free)
+        grid_flat = occupied_indices.astype(np.int8) * -1
+        expanded_grid = grid_flat.reshape(self.grid_dim, self.grid_dim)
+
+        expanded_grid = np.flipud(expanded_grid)
+        
+        self.expanded_grid = expanded_grid
+
 
     def getGrid(self):
         return self.grid
+    
+    def getExpandedGrid(self):
+        return self.expanded_grid
 
     def getCellSizeCm(self):
         return self.cell_size_cm
