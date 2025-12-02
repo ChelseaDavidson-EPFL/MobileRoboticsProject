@@ -3,6 +3,8 @@ import tdmclient.notebook
 from tdmclient import ClientAsync, aw
 import time
 
+MAX_MOTROR_SPEED = 500
+
 
 class Thymio :
     ir_sensors = [0, 0, 0, 0, 0]
@@ -52,6 +54,14 @@ class Thymio :
 
     def set_motor_speeds(self, speeds):
         self.node.flush()
+        if(speeds[0]>MAX_MOTROR_SPEED):
+            speeds[0]=MAX_MOTROR_SPEED
+        if(speeds[0]<-MAX_MOTROR_SPEED):
+            speeds[0]=-MAX_MOTROR_SPEED
+        if(speeds[1]>MAX_MOTROR_SPEED):
+            speeds[1]=MAX_MOTROR_SPEED
+        if(speeds[1]<-MAX_MOTROR_SPEED):
+            speeds[1]=-MAX_MOTROR_SPEED
         self.motor_speeds = speeds
         self.node.send_set_variables({"motor.left.target": [speeds[0]], "motor.right.target": [speeds[1]]})
 
