@@ -287,7 +287,7 @@ def expanded_dijkstra(grid, start, goal):
     robot_size_cells = utils.cm_to_cell(max(utils.ROBOT_H, utils.ROBOT_W))
 
     # Expand obstacles by robot size using cv2 dilation
-    expanded_grid = expand_grid_by_robot(grid, robot_size_cells,6)
+    expanded_grid = expand_grid_by_robot(grid, robot_size_cells,2)
 
     # Run Dijkstra (robot as point)
     came_from = {}
