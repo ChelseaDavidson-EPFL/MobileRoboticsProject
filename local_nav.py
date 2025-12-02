@@ -2,6 +2,7 @@ from thymio import Thymio
 import utils
 import numpy as np
 import math
+import utils
 
 GLOBAL_IR_THLD = 4000
 LOCAL_IR_THLD = 2000
@@ -12,8 +13,10 @@ FWD_SPEED = 150
 ROT_SPEED = 90
 MAX_IR_VAL = 5000
 DIS_THLD = 2000
-ADVENCE_DIST = 4*utils.ROBOT_H/5
+ADVENCE_DIST = utils.ROBOT_H
 
+KIDNAP_THRESHOLD = 100  # Below this value = robot is lifted (no ground detected)
+GROUND_THRESHOLD = 700  # Above this value = robot is back on ground
 
 def is_object(thym: Thymio):
     ir_max = max(thym.ir_sensors)
@@ -59,7 +62,8 @@ def avoid_obstacle(thym: Thymio, avoid_right: bool,  stage=0, pos_at_obst=[], an
             case 4: 
                 thym.set_motor_speeds([FWD_SPEED, FWD_SPEED])
                 dis_from_obst = math.sqrt((thym.pos[0]-pos_at_obst[0])**2 + (thym.pos[1]-pos_at_obst[1])**2)
-                if(dis_from_obst>=ADVENCE_DIST):
+                if(dis_from_obst>=ADVENCE_DIST/2):
+                    thym.stop()
                     return True, 0, [0,0], 0
     else:
         # Avoid LEFT: keep obstacle on RIGHT (sensor 4)
@@ -93,7 +97,8 @@ def avoid_obstacle(thym: Thymio, avoid_right: bool,  stage=0, pos_at_obst=[], an
             case 4: 
                 thym.set_motor_speeds([FWD_SPEED, FWD_SPEED])
                 dis_from_obst = math.sqrt((thym.pos[0]-pos_at_obst[0])**2 + (thym.pos[1]-pos_at_obst[1])**2)
-                if(dis_from_obst>=ADVENCE_DIST):
+                if(dis_from_obst>=ADVENCE_DIST/2):
+                    thym.stop()
                     return True, 0, [0,0], 0
     
     return False, stage, pos_at_obst, angle_at_obst
@@ -191,3 +196,46 @@ def avoid_right(thym: Thymio, grid):
     return obstacles_left >= obstacles_right
     
     
+    thym.set_motor_speeds([speed_L, speed_R])
+    return
+
+
+def check_kidnap(thym: Thymio):
+    """
+    Check if the robot has been kidnapped (lifted off the ground).
+    Ground sensors return HIGH values when close to ground, LOW values when lifted.
+
+    Returns:
+        - "kidnapped" if robot was just lifted (transition to kidnapped state)
+        - "recovered" if robot was put back on ground (transition from kidnapped)
+        - None if no state change
+    """
+    ground_sensors = thym.get_ground_sensors()
+
+    if(max(thym.ground_sensors)<KIDNAP_THRESHOLD):
+        # print("KIDNAPPED groud sensors:", thym.ground_sensors)
+        return True
+    else:
+        # print("GROUND groud sensors:", thym.ground_sensors)
+        return False
+
+    # # Robot is lifted when ground sensors read LOW (no ground detected)
+    # is_lifted = ground_sensors[0] < KIDNAP_THRESHOLD and ground_sensors[1] < KIDNAP_THRESHOLD
+
+    # # Robot is on ground when sensors read HIGH
+    # is_on_ground = ground_sensors[0] > GROUND_THRESHOLD and ground_sensors[1] > GROUND_THRESHOLD
+
+    # if is_lifted and not thym.is_kidnapped:
+    #     # Robot just got kidnapped
+    #     thym.is_kidnapped = True
+    #     thym.stop()
+    #     print("KIDNAPPED: Robot lifted! Motors stopped.")
+    #     return "kidnapped"
+
+    # elif is_on_ground and thym.is_kidnapped:
+    #     # Robot was put back on the ground
+    #     thym.is_kidnapped = False
+    #     print("RECOVERED: Robot back on ground. Ready to relaunch path finding.")
+    #     return "recovered"
+
+    return None
