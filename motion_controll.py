@@ -11,7 +11,7 @@ ROT_SPEED = 8
 # angle at witch it starts to go forward
 MAX_ANGLE = 0.8
 # Astolfi angle gain
-K_ASTOL = 3000
+K_ASTOL = 4000
 # Distance between the center of the tymio and the wheels
 DIST_TO_WHEELS = 0.0475
 
