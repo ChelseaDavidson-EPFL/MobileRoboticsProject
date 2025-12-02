@@ -3,15 +3,15 @@ import math
 from thymio import Thymio
 
 #radius around witch the goal is reached (in cm)
-GOAL_RADUIS = 1
+GOAL_RADUIS = 2
 # Forward speed
-FWD_SPEED = 100
+FWD_SPEED = 150
 # Rotation speed
 ROT_SPEED = 8
 # angle at witch it starts to go forward
 MAX_ANGLE = 0.8
 # Astolfi angle gain
-K_ASTOL = 3000
+K_ASTOL = 4000
 # Distance between the center of the tymio and the wheels
 DIST_TO_WHEELS = 0.0475
 
