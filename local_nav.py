@@ -6,18 +6,18 @@ import math
 GLOBAL_IR_THLD = 5000
 LOCAL_IR_THLD = 2000
 
-K_AVOID  = 200
+K_AVOID  = 1
 K_BREAK = 1200
-FWD_SPEED = 100
-ROT_SPEED = 20
+FWD_SPEED = 50
+ROT_SPEED = 30
 MAX_IR_VAL = 5000
 DIS_THLD = 2000
 
 
 def is_object(thym: Thymio):
-    ir_sum = sum(thym.ir_sensors)
-    if(thym.nav_mode == "GLOBAL" and ir_sum > GLOBAL_IR_THLD or
-       thym.nav_mode == "LOCAL" and ir_sum > LOCAL_IR_THLD):
+    ir_max = max(thym.ir_sensors)
+    if(thym.nav_mode == "GLOBAL" and ir_max > GLOBAL_IR_THLD or
+       thym.nav_mode == "LOCAL" and ir_max > LOCAL_IR_THLD):
         return True
     return False
 
@@ -73,12 +73,13 @@ def avoid_obstacle(thym: Thymio, avoid_right: bool, start_angle):
     ir_sens = thym.ir_sensors
     last_angle = thym.last_orient
     if(avoid_right):
-        if(ir_sens[0]==0 and sum(ir_sens[1:5])>0):
+        if(ir_sens[0]==0 or sum(ir_sens[1:5])>0):
             thym.set_motor_speeds([ROT_SPEED, -ROT_SPEED])
         else :
+            print(f"IR left: {ir_sens[0]}")
             thym.set_motor_speeds([int(FWD_SPEED - K_AVOID*(ir_sens[0]-DIS_THLD)), FWD_SPEED])
     else:
-        if(ir_sens[4]==0 and sum(ir_sens[0:4])>0):
+        if(ir_sens[4]==0 or sum(ir_sens[0:4])>0):
             thym.set_motor_speeds([-ROT_SPEED, ROT_SPEED])
         else :
             thym.set_motor_speeds([FWD_SPEED, int(FWD_SPEED - K_AVOID*(ir_sens[4]-DIS_THLD))])
