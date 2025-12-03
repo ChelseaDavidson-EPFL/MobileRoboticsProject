@@ -284,22 +284,22 @@ class Vision:
 
         # Must detect both markers
         if not (1 in ids and 2 in ids):
-            print(f"Missing arena markers: found {ids}, expected IDs 1 and 2")
+            print(f"Missing arena markers: found ID {ids}, expected IDs 1 and 2")
             return None, None, None, None
 
         # Find pixel centers of markers
-        idx_bl = list(ids).index(1)
-        idx_tr = list(ids).index(2)
+        idx_bl = list(ids).index(1) # Bottom left arena marker
+        idx_tr = list(ids).index(2) # Top right arena marker
 
         corners_bl = corners[idx_bl][0]  # 4 corner points (TL,TR,BR,BL)
         corners_tr = corners[idx_tr][0]
 
         # Pixel center of BL marker
-        bl_px = (int(corners_bl[:,0].mean()), int(corners_bl[:,1].mean()))
+        bl_px = (int(corners_bl[:,0].mean()), int(corners_bl[:,1].mean())) # Mean x points of all rows and mean y points of the all rows of the corners
         # Pixel center of TR marker
         tr_px = (int(corners_tr[:,0].mean()), int(corners_tr[:,1].mean()))
 
-        # Build rectangle:
+        # Build rectangular arena in pixels:
         x1, y1 = bl_px
         x2, y2 = tr_px
         br_px = (x2, y1)
@@ -309,8 +309,7 @@ class Vision:
 
         # Compute meters per pixel
 
-        # Marker width in pixels (use top-left -> top-right edge)
-        # For BL marker (ID 1)
+        # Use BL marker (ID 1) to find the marker width in pixels (use top-left to top-right edge)
         bl_marker_width_px = np.linalg.norm(corners_bl[1] - corners_bl[0])  # TR - TL
 
         if bl_marker_width_px < 1:
@@ -399,22 +398,22 @@ class Vision:
             return None, None, None, None
 
         # Convert ids to a simple list - instead of something like array([2], [1], [0]), it gives [2, 1, 0]
-        ids = ids.flatten()
+        ids = ids.flatten()        
 
         # Check if ID 0 exists
         if 0 not in ids:
             return None, None, None, None
 
         # Find index of ID 0 - in [2, 1, 0], index would be 2
-        idx = list(ids).index(0)
+        idx = list(ids).index(0) # Convert to list so that you can call .index(0) - list(ids) in form [np.int32(2), np.int32(1), np.int32(0)]
 
         # Get its corners
-        robotCorners = corners[idx][0]  # corners looks something like [array([[[x1,y1], [x2,y2], [x3,y3], [x4,y4]]]), array([[[x1,y1], [x2,y2], [x3,y3], [x4,y4]]]), ...]) so need [0] to get the actual corners for ID 0
+        robotCorners = corners[idx][0]  # corners looks something like [array([[[x1,y1], [x2,y2], [x3,y3], [x4,y4]]]), array([[[x1,y1], [x2,y2], [x3,y3], [x4,y4]]]), ...]) so need [0] to get the actual corners at the idx (ID 0)
         tl, tr, br, bl = robotCorners
 
         # Find center pixel of the marker
-        cx = int(robotCorners[:, 0].mean()) # Average all x values
-        cy = int(robotCorners[:, 1].mean()) # Average all y values 
+        cx = int(robotCorners[:, 0].mean()) # Average of x values in all rows
+        cy = int(robotCorners[:, 1].mean()) # Average of y values in all rows
 
         # Heading direction vector (TR - TL)
         dir_vec = tr - tl
@@ -455,7 +454,7 @@ class Vision:
         idx = list(ids).index(goalId)
 
         # Get its corners
-        goalCorners = corners[idx][0]  # shape (4,2)
+        goalCorners = corners[idx][0]
 
         # Find center pixel of the marker
         cx = int(goalCorners[:, 0].mean())
@@ -465,13 +464,16 @@ class Vision:
 
     def computeHomography(self, arena_corners_pixels, arena_width_m, arena_height_m):
         """
-        arena_corners_pixels: list of 4 (u,v) pixel points in the order:
-            bottom-left, bottom-right, top-right, top-left
-        arena_width_m: real arena width in meters
-        arena_height_m: real arena height in meters
+        Returns the H to convert pixel coordinates to real world meters such that (X, Y) = H * (u, v)
+        
+        Inputs:
+            arena_corners_pixels: list of 4 (u,v) pixel points in the order:
+                bottom-left, bottom-right, top-right, top-left
+            arena_width_m: real arena width in meters
+            arena_height_m: real arena height in meters
         """
 
-        # Real-world coordinates of the arena corners (meters)
+        # Real-world coordinates of the arena corners (meters) - defines global coordinate system where BL is 0,0
         world_corners = np.array([
             [0, 0],                          # Bottom-left
             [arena_width_m, 0],              # Bottom-right
@@ -479,10 +481,14 @@ class Vision:
             [0, arena_height_m]              # Top-left
         ], dtype=float)
 
-        img_pts = np.array(arena_corners_pixels, dtype=float)
-        world_pts = world_corners.reshape(-1, 1, 2)
+        img_pts = np.array(arena_corners_pixels, dtype=float) # shape: (4, 2)
+        world_pts = world_corners.reshape(-1, 1, 2) # shape: (4, 1, 2)
 
         H, _ = cv2.findHomography(img_pts, world_pts)
+        # FindHomography solves for a matrix H that satisfies the folling (2D homography):
+        #       [ X ]     [ h11 h12 h13 ]   [ u ]
+        #       [ Y ]  ~  [ h21 h22 h23 ] * [ v ]
+        #       [ 1 ]     [ h31 h32 h33 ]   [ 1 ]
         return H
 
 
@@ -754,9 +760,10 @@ if __name__ == "__main__":
         visionInstance.visualiseArena(vis, visionInstance.arena_corners_pixels)
 
         # --- Always detect and draw robot pose ---
-        [X, Y], robot_heading_angle = visionInstance.getRobotPoseAndVisualise(frame, vis)
-        if (X is None or Y is None or robot_heading_angle is None):
+        position, robot_heading_angle = visionInstance.getRobotPoseAndVisualise(frame, vis)
+        if (position is None or robot_heading_angle is None):
             continue
+        [X, Y] = position
         # print(f"X: {X:.5f}, Y: {Y:.5f}, Direction: {robot_heading_angle:.5f}")
 
         path = [[X*100, Y*100], [40, 40], [50, 60], [70, 70]]
