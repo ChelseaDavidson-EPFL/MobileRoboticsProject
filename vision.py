@@ -278,14 +278,14 @@ class Vision:
 
         if ids is None:
             print("No ArUco markers detected")
-            return None, None, None, None
+            return None, None, None
 
         ids = ids.flatten()
 
         # Must detect both markers
         if not (1 in ids and 2 in ids):
             print(f"Missing arena markers: found ID {ids}, expected IDs 1 and 2")
-            return None, None, None, None
+            return None, None, None
 
         # Find pixel centers of markers
         idx_bl = list(ids).index(1) # Bottom left arena marker
