@@ -9,9 +9,10 @@ RATIO_SPEED = 34.675    # from filter computations (wanted speed / mean speed ov
 q_v = 0.300625          # velocity variance for filter
 q_x = 0.00076067        # x position variance for filter
 q_y = 0.00023067        # y position variance for filter
-q_theta = 0.00051989/2    # angle variance for filter
-r_x = 0.00076067        # x position measurement variande for filter
-r_y = 0.00023067        # y position measurement variande for filter
+q_theta = 0.00025994    # angle variance for filter
+r_x = 0.00076067        # x position measurement variance for filter
+r_y = 0.00023067        # y position measurement variance for filter
+r_theta = 0.00025994    # angle measurement variance for filter
  
 # # ============================================================
 #  GLOBAL VARIABLES (accessible by all files)
