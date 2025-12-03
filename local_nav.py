@@ -4,28 +4,74 @@ import numpy as np
 import math
 import utils
 
-GLOBAL_IR_THLD = 4000
-LOCAL_IR_THLD = 2000
+# ============================================================
+#  CONSTANTS FOR LOCAL NAVIGATION
+# ============================================================
+GLOBAL_IR_THLD = 4000   # IR threshold for obstacle detection in global navigation mode
+LOCAL_IR_THLD = 2000    # IR threshold for obstacle detection in local navigation mode
 
-K_AVOID  = 100
-K_BREAK = 1200
-FWD_SPEED = 150
-ROT_SPEED = 90
-MAX_IR_VAL = 5000
-DIS_THLD = 2000
-ADVENCE_DIST = utils.ROBOT_H
+K_AVOID  = 100          # Proportional gain for obstacle avoidance speed adjustment
+K_BREAK = 1200          # Braking constant (unused)
+FWD_SPEED = 150         # Forward speed during obstacle avoidance
+ROT_SPEED = 90          # Rotation speed when turning
+MAX_IR_VAL = 5000       # Maximum IR sensor value for normalization
+DIS_THLD = 2000         # Distance threshold (unused)
+ADVENCE_DIST = utils.ROBOT_H  # Distance to advance after clearing obstacle
 
 KIDNAP_THRESHOLD = 100  # Below this value = robot is lifted (no ground detected)
 GROUND_THRESHOLD = 700  # Above this value = robot is back on ground
 
+
+# ============================================================
+#  OBSTACLE DETECTION
+# ============================================================
 def is_object(thym: Thymio):
+    """
+    Checks if an obstacle is detected by the IR sensors.
+    Uses different thresholds depending on navigation mode.
+
+    Args:
+        thym: Thymio robot instance with IR sensor data
+
+    Returns:
+        bool: True if obstacle detected, False otherwise
+    """
     ir_max = max(thym.ir_sensors)
     if(thym.nav_mode == "GLOBAL" and ir_max > GLOBAL_IR_THLD or
        thym.nav_mode == "LOCAL" and ir_max > LOCAL_IR_THLD):
         return True
     return False
 
+
+# ============================================================
+#  OBSTACLE AVOIDANCE
+# ============================================================
 def avoid_obstacle(thym: Thymio, avoid_right: bool,  stage=0, pos_at_obst=[], angle_at_obst=0):
+    """
+    Executes a multi-stage obstacle avoidance maneuver.
+    The robot either follows the left or right edge of an obstacle until it can resume global navigation.
+
+    Stages:
+        0: Rotate to align with obstacle edge
+        1: Follow obstacle edge using wall-following behavior
+        2: Advance forward after clearing the obstacle
+        3: Rotate back towards original heading
+        4: Advance a bit more and finish avoidance
+
+    Args:
+        thym: Thymio robot instance
+        avoid_right: True to avoid right (keep obstacle on left), False to avoid left
+        stage: Current stage of the avoidance maneuver (0-4)
+        pos_at_obst: Position where obstacle was detected [x_cm, y_cm]
+        angle_at_obst: Orientation when obstacle was detected
+
+    Returns:
+        tuple: (obstacle_avoided, stage, pos_at_obst, angle_at_obst)
+            - obstacle_avoided: True if avoidance maneuver is complete
+            - stage: Updated stage number
+            - pos_at_obst: Updated position at obstacle
+            - angle_at_obst: Updated angle at obstacle
+    """
     ir_sens = thym.ir_sensors
     last_angle = thym.last_orient
     print(f"stage: {stage}, IR: {ir_sens}")
@@ -103,38 +149,25 @@ def avoid_obstacle(thym: Thymio, avoid_right: bool,  stage=0, pos_at_obst=[], an
     
     return False, stage, pos_at_obst, angle_at_obst
 
-# def avoid_obstacle(thym: Thymio, grid, avoid_right: bool):
-#     ir_sens = thym.ir_sensors
-#     left_sum = ir_sens[0]+ir_sens[1]
-#     right_sum = ir_sens[3]+ir_sens[4]
-#     fwd_speed = int(FWD_SPEED - K_BREAK*((ir_sens[1]+ir_sens[2]+ir_sens[3])/3*MAX_IR_VAL))
 
-#     if(fwd_speed<=0): 
-#         fwd_speed = 0
-            
-#     speed_L = fwd_speed
-#     speed_R = fwd_speed
-
-#     if(fwd_speed == 0 and right_sum == 0 and left_sum == 0):
-#         if(avoid_right):
-#             left_sum = 1000
-#         else:
-#             right_sum = 1000
-        
-
-#     if(left_sum > right_sum):
-#         speed_R = int(speed_R - (left_sum/MAX_IR_VAL)*K_AVOID)      
-#     else: 
-#         speed_L = int(speed_L - (right_sum/MAX_IR_VAL)*K_AVOID) 
-        
-#     thym.set_motor_speeds([speed_L, speed_R])
-#     return
-
-
+# ============================================================
+#  OBSTACLE SIDE DETECTION
+# ============================================================
 def avoid_right(thym: Thymio, grid):
     """
-    Checks if there are more obstacles to the right or left of the robot.
-    Returns True if the robot should avoid to the right (obstacle on the left).
+    Analyzes the area in front of the robot to determine which side has more obstacles.
+    Used to decide whether to follow the left or right edge of an obstacle.
+
+    The function scans a rectangular region ahead of the robot, counting obstacles
+    on each side. The robot should avoid towards the side with fewer obstacles.
+
+    Args:
+        thym: Thymio robot instance with position and orientation
+        grid: Occupancy grid (0=free, -1=obstacle)
+
+    Returns:
+        bool: True if robot should avoid right (more obstacles on left),
+              False if robot should avoid left (more obstacles on right)
     """
     # Convert Thymio position to grid coordinates
     pos_cm = (thym.pos[0], thym.pos[1])
@@ -194,48 +227,27 @@ def avoid_right(thym: Thymio, grid):
     # Return True if more obstacles on the left (so avoid to the right)
     print(f"Obstacles in front - Left: {obstacles_left}, Right: {obstacles_right}")
     return obstacles_left >= obstacles_right
-    
-    
-    thym.set_motor_speeds([speed_L, speed_R])
-    return
 
 
+# ============================================================
+#  KIDNAP DETECTION
+# ============================================================
 def check_kidnap(thym: Thymio):
     """
-    Check if the robot has been kidnapped (lifted off the ground).
-    Ground sensors return HIGH values when close to ground, LOW values when lifted.
+    Detects if the robot has been lifted off the ground (kidnapped).
+    Uses ground sensors to detect absence of surface underneath.
+
+    Args:
+        thym: Thymio robot instance with ground sensor data
 
     Returns:
-        - "kidnapped" if robot was just lifted (transition to kidnapped state)
-        - "recovered" if robot was put back on ground (transition from kidnapped)
-        - None if no state change
+        bool: True if robot is lifted (kidnapped), False otherwise
     """
     ground_sensors = thym.get_ground_sensors()
 
+    # Check if the robot is lifted (kidnapped)
     if(max(thym.ground_sensors)<KIDNAP_THRESHOLD):
-        # print("KIDNAPPED groud sensors:", thym.ground_sensors)
         return True
     else:
-        # print("GROUND groud sensors:", thym.ground_sensors)
         return False
-
-    # # Robot is lifted when ground sensors read LOW (no ground detected)
-    # is_lifted = ground_sensors[0] < KIDNAP_THRESHOLD and ground_sensors[1] < KIDNAP_THRESHOLD
-
-    # # Robot is on ground when sensors read HIGH
-    # is_on_ground = ground_sensors[0] > GROUND_THRESHOLD and ground_sensors[1] > GROUND_THRESHOLD
-
-    # if is_lifted and not thym.is_kidnapped:
-    #     # Robot just got kidnapped
-    #     thym.is_kidnapped = True
-    #     thym.stop()
-    #     print("KIDNAPPED: Robot lifted! Motors stopped.")
-    #     return "kidnapped"
-
-    # elif is_on_ground and thym.is_kidnapped:
-    #     # Robot was put back on the ground
-    #     thym.is_kidnapped = False
-    #     print("RECOVERED: Robot back on ground. Ready to relaunch path finding.")
-    #     return "recovered"
-
     return None
