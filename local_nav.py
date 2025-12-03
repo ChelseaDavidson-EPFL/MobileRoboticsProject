@@ -51,7 +51,7 @@ def avoid_obstacle(thym: Thymio, avoid_right: bool,  stage=0, pos_at_obst=[], an
             case 2:
                 thym.set_motor_speeds([FWD_SPEED, FWD_SPEED])
                 dis_from_obst = math.sqrt((thym.pos[0]-pos_at_obst[0])**2 + (thym.pos[1]-pos_at_obst[1])**2)
-                if(dis_from_obst>=ADVENCE_DIST):
+                if(dis_from_obst>=4*ADVENCE_DIST/3):
                     stage=3
                     angle_at_obst = thym.orient
             case 3:
@@ -62,7 +62,7 @@ def avoid_obstacle(thym: Thymio, avoid_right: bool,  stage=0, pos_at_obst=[], an
             case 4: 
                 thym.set_motor_speeds([FWD_SPEED, FWD_SPEED])
                 dis_from_obst = math.sqrt((thym.pos[0]-pos_at_obst[0])**2 + (thym.pos[1]-pos_at_obst[1])**2)
-                if(dis_from_obst>=ADVENCE_DIST/2):
+                if(dis_from_obst>=2*ADVENCE_DIST/3):
                     thym.stop()
                     return True, 0, [0,0], 0
     else:
@@ -86,7 +86,7 @@ def avoid_obstacle(thym: Thymio, avoid_right: bool,  stage=0, pos_at_obst=[], an
             case 2:
                 thym.set_motor_speeds([FWD_SPEED, FWD_SPEED])
                 dis_from_obst = math.sqrt((thym.pos[0]-pos_at_obst[0])**2 + (thym.pos[1]-pos_at_obst[1])**2)
-                if(dis_from_obst>=ADVENCE_DIST):
+                if(dis_from_obst>=4*ADVENCE_DIST/3):
                     stage=3
                     angle_at_obst = thym.orient
             case 3:
@@ -97,7 +97,7 @@ def avoid_obstacle(thym: Thymio, avoid_right: bool,  stage=0, pos_at_obst=[], an
             case 4: 
                 thym.set_motor_speeds([FWD_SPEED, FWD_SPEED])
                 dis_from_obst = math.sqrt((thym.pos[0]-pos_at_obst[0])**2 + (thym.pos[1]-pos_at_obst[1])**2)
-                if(dis_from_obst>=ADVENCE_DIST/2):
+                if(dis_from_obst>=2*ADVENCE_DIST/3):
                     thym.stop()
                     return True, 0, [0,0], 0
     
@@ -163,7 +163,7 @@ def avoid_right(thym: Thymio, grid):
     left_row = -right_row
     
     # Check an area in front of the robot (both sides and forward)
-    lateral_distance = 40  # How far to check sideways
+    lateral_distance = 50  # How far to check sideways
     forward_depth = 30     # How far to check forward
     obstacles_right = 0
     obstacles_left = 0
