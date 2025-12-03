@@ -680,39 +680,61 @@ class Vision:
         # Draw the point on the image
         cv2.circle(vis, (int(camera_x), int(camera_y)), 3, colour, -1)
 
-    def visualiseGlobalPath(self, vis, path_waypoints, colour=(0, 255, 0)):
+    def visualiseGlobalPath(self, vis, path_waypoints, colour=(0, 255, 0), max_points=200):
         """
-        Draw a global path onto the camera frame. Takes cm
+        Draw a global path onto the camera frame. Takes cm.
         
         vis            : frame to draw on
-        path_waypoints : list of (x, y) global coordinates
+        path_waypoints : list of (x, y) global coordinates in cm
         colour         : BGR colour for points and lines
+        max_points     : max number of points to plot (down-samples if needed)
         """
 
         if not path_waypoints or len(path_waypoints) < 1:
             return
 
+        # --------------------------------------------
+        # Apply sampling if path is too long
+        # --------------------------------------------
+        total_pts = len(path_waypoints)
+
+        if total_pts > max_points:
+            step = total_pts / max_points
+            sampled = []
+
+            for i in range(max_points):
+                idx = int(i * step)
+                sampled.append(path_waypoints[idx])
+
+            # Ensure last point is exactly included
+            if sampled[-1] != path_waypoints[-1]:
+                sampled.append(path_waypoints[-1])
+
+            path_waypoints = sampled
+
+        # --------------------------------------------
+        # Convert sampled waypoints to pixel points
+        # --------------------------------------------
         pixel_points = []
 
-        # Convert all global waypoints to pixel coordinates
         for [x, y] in path_waypoints:
-            x, y = x/100, y/100
-            px, py = self.globalToCamera(x, y)
+            # convert cm to m
+            x, y = x / 100.0, y / 100.0
 
+            px, py = self.globalToCamera(x, y)
             if px is None or py is None:
-                continue  # skip invalid points
+                continue # skip invalid points
 
             pixel_points.append((int(px), int(py)))
 
             # Draw waypoint as a circle
             self.visualiseGlobalPoint(vis, x, y, colour)
 
-        # Draw lines between consecutive pixel points
+        # --------------------------------------------
+        # Draw the connecting path lines
+        # --------------------------------------------
         for i in range(len(pixel_points) - 1):
-            pt1 = pixel_points[i]
-            pt2 = pixel_points[i + 1]
-
-            cv2.line(vis, pt1, pt2, colour, 2)
+            cv2.line(vis, pixel_points[i], pixel_points[i + 1], colour, 2)
 
     def visualiseGlobalPoints(self, vis, points, colour=(0, 255, 0)):  # BGR format - green colour at default
         """
