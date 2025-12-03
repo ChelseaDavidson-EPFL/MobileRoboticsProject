@@ -3,11 +3,11 @@ import math
 from thymio import Thymio
 
 #radius around witch the goal is reached (in cm)
-GOAL_RADUIS = 2
+GOAL_RADUIS = 2.5
 # Forward speed
 FWD_SPEED = 150
 # Rotation speed
-ROT_SPEED = 8
+ROT_SPEED = 100
 # angle at witch it starts to go forward
 MAX_ANGLE = 0.8
 # Astolfi angle gain
@@ -39,9 +39,10 @@ def follow_path(thym: Thymio, next_goal):
 
     if(abs(diff_angle)>MAX_ANGLE):
         if(diff_angle>=0):
-            thym.set_motor_speeds([ROT_SPEED, -ROT_SPEED])
-        else:
             thym.set_motor_speeds([-ROT_SPEED, ROT_SPEED])
+        else:
+            thym.set_motor_speeds([ROT_SPEED, -ROT_SPEED])
+        return False
         
     # Astolfi implementation
     angle_speed = K_ASTOL * diff_angle * DIST_TO_WHEELS
