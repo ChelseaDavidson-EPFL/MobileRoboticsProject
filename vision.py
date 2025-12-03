@@ -120,7 +120,7 @@ class Vision:
             # 6. Create and store occupancy grid
             # ----------------------------
             self.createGrid(self.arena_width_m, self.arena_height_m, global_polygons)
- 
+           
             # ----------------------------
             # 7. Visualisations
             # ----------------------------
@@ -137,10 +137,8 @@ class Vision:
 
     def createGrid(self, arena_w, arena_h, obstacles):
         """
-        Creates a grid in world frame coordinates where the bottom left corner of the arena is 0,0 so the top right corner will be arena_w, arena_h.
-        Both the robot position and obstacle_polygons are relative to this 0,0 frame. The grid has (0=free, -1=obstacle) using matplotlib.path.Path.
-
-        Credit: Quitterie
+       Creates a grid in world frame coordinates where the bottom left corner of the arena is 0,0 so the top right corner
+       will be arena_w, arena_h. Both the robot position and obstacle_polygons are relative to this 0,0 frame. The grid has (0=free, -1=obstacle) using matplotlib.path.Path.
         """
         self.cell_size_cm = (arena_w/self.grid_dim)*100
         cell_size_m = self.cell_size_cm/100
