@@ -4,9 +4,9 @@
 GRID_DIM = 200
 ROBOT_H = 11            # Robot height in cm (Thymio)
 ROBOT_W = 11            # Robot width in cm (Thymio)
-FREQ_MAIN_LOOP = 20     # Frequency of the main loop (in Hz)
+FREQ_MAIN_LOOP = 10     # Frequency of the main loop (in Hz)
 RATIO_SPEED = 34.675    # from filter computations (wanted speed / mean speed over 10 runs)
-SAFETY_MARGIN = 4       # in cells, margin around obstacles for path planning
+SAFETY_MARGIN = 10       # in cells, margin around obstacles for path planning
 q_v = 0.300625          # velocity variance for filter
 q_x = 0.00076067        # x position variance for filter
 q_y = 0.00023067        # y position variance for filter

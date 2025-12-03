@@ -670,7 +670,7 @@ class Vision:
             return
                 
         # Draw the point on the image
-        cv2.circle(vis, (int(camera_x), int(camera_y)), 3, colour, -1)
+        cv2.circle(vis, (int(camera_x), int(camera_y)), 2, colour, -1)
 
     def visualiseGlobalPath(self, vis, path_waypoints, colour=(0, 255, 0)):
         """
