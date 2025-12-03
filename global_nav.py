@@ -4,6 +4,7 @@ from matplotlib.colors import ListedColormap
 from heapq import heappush, heappop
 import utils
 import cv2
+import utils
 
 
 # ============================================================
@@ -143,7 +144,7 @@ def display_grid(map_grid, start=None, goal=None):
 #  GRID EXPANSION using cv2 dilation (for expanded_dijkstra)
 # ============================================================
 
-def expand_grid_by_robot(grid, robot_size_cells, safety_margin=0):
+def expand_grid_by_robot(grid, robot_size_cells):
     """
     Expands obstacles in the grid by dilating them using cv2.
     This effectively grows obstacles by robot_size_cells/2 in all directions.
@@ -158,13 +159,9 @@ def expand_grid_by_robot(grid, robot_size_cells, safety_margin=0):
     # Convert to binary image (255 = obstacle, 0 = free)
     binary = np.where(grid == -1, 255, 0).astype(np.uint8)
 
-    # Circular kernel option
-    #kernel_size = max(1, int(robot_size_cells / 2))
-    #kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size * 2 + 1, kernel_size * 2 + 1))
-
-    # Rectangular kernel 
-    kernel_size = max(1, int(robot_size_cells / 2)+safety_margin)
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_size * 2 + 1, kernel_size * 2 + 1))
+    # Circular kernel
+    kernel_size = max(1, int(robot_size_cells / 2)+utils.SAFETY_MARGIN)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size * 2 + 1, kernel_size * 2 + 1))
 
     # Dilate obstacles
     dilated = cv2.dilate(binary, kernel, iterations=1)
@@ -194,7 +191,7 @@ def expanded_a_star(grid, start, goal):
     """
     # Get robot size in cells and expand obstacles
     robot_size_cells = utils.cm_to_cell(max(utils.ROBOT_H, utils.ROBOT_W))
-    expanded_grid = expand_grid_by_robot(grid, robot_size_cells, 6)
+    expanded_grid = expand_grid_by_robot(grid, robot_size_cells)
 
     came_from = {}
     g_costs = {start: 0}
@@ -205,7 +202,7 @@ def expanded_a_star(grid, start, goal):
     current_pos = start
 
     while open_set:
-        current_f_cost, current_g_cost, current_pos = heappop(open_set)
+        _, current_g_cost, current_pos = heappop(open_set)
 
         # Stop condition
         if current_pos == goal:
@@ -276,7 +273,7 @@ def expanded_dijkstra(grid, start, goal):
     robot_size_cells = utils.cm_to_cell(max(utils.ROBOT_H, utils.ROBOT_W))
 
     # Expand obstacles by robot size using cv2 dilation
-    expanded_grid = expand_grid_by_robot(grid, robot_size_cells, 6)
+    expanded_grid = expand_grid_by_robot(grid, robot_size_cells)
 
     # Run Dijkstra (robot as point)
     came_from = {}
@@ -338,207 +335,6 @@ def expanded_dijkstra(grid, start, goal):
         return path, expanded_grid
 
     return None, expanded_grid
-
-
-# ============================================================
-#  PATHFINDING ON PRE-EXPANDED GRID (from vision.py)
-# ============================================================
-
-def dijkstra(expanded_grid, start, goal):
-    """
-    Finds the shortest path using Dijkstra's algorithm with 8-connectivity.
-    Uses a pre-expanded grid (obstacles already expanded by robot size).
-
-    Args:
-        expanded_grid: pre-expanded occupancy grid (0=free, -1=obstacle)
-        start: (row, col) start position in grid coordinates
-        goal: (row, col) goal position in grid coordinates
-
-    Returns:
-        path: list of (row, col) tuples, or None if no path found
-    """
-    # Validate start and goal
-    if expanded_grid[start[0], start[1]] == -1:
-        print(f"Warning: Start position {start} is inside an obstacle!")
-        return None
-    if expanded_grid[goal[0], goal[1]] == -1:
-        print(f"Warning: Goal position {goal} is inside an obstacle!")
-        return None
-
-    came_from = {}
-    g_costs = {start: 0}
-    explored = set()
-
-    # Priority queue: (g_cost, position)
-    open_set = [(0, start)]
-    current_pos = start
-
-    while open_set:
-        current_g_cost, current_pos = heappop(open_set)
-
-        # Stop condition
-        if current_pos == goal:
-            break
-
-        # Skip if already explored
-        if current_pos in explored:
-            continue
-        explored.add(current_pos)
-
-        # 8-connected neighbors
-        directions = [
-            (-1, 0), (1, 0), (0, -1), (0, 1),  # Cardinal
-            (-1, -1), (-1, 1), (1, -1), (1, 1)  # Diagonal
-        ]
-
-        for dr, dc in directions:
-            nx, ny = current_pos[0] + dr, current_pos[1] + dc
-            neighbor = (nx, ny)
-
-            # Bounds check
-            if not (0 <= nx < expanded_grid.shape[0] and 0 <= ny < expanded_grid.shape[1]):
-                continue
-
-            # Obstacle check
-            if expanded_grid[nx, ny] == -1:
-                continue
-
-            # Movement cost (sqrt(2) for diagonal, 1 for cardinal)
-            move_cost = np.sqrt(2) if (abs(dr) == 1 and abs(dc) == 1) else 1
-            tentative_g_cost = current_g_cost + move_cost
-
-            if neighbor not in g_costs or tentative_g_cost < g_costs[neighbor]:
-                g_costs[neighbor] = tentative_g_cost
-                came_from[neighbor] = current_pos
-                heappush(open_set, (tentative_g_cost, neighbor))
-
-    # Reconstruct path
-    if current_pos == goal:
-        path = []
-        while current_pos != start:
-            path.append(current_pos)
-            current_pos = came_from[current_pos]
-        path.append(start)
-        path.reverse()
-        return path
-
-    return None
-
-
-def a_star(expanded_grid, start, goal):
-    """
-    Finds the shortest path using A* algorithm with 8-connectivity.
-    Uses a pre-expanded grid (obstacles already expanded by robot size).
-
-    Args:
-        expanded_grid: pre-expanded occupancy grid (0=free, -1=obstacle)
-        start: (row, col) start position in grid coordinates
-        goal: (row, col) goal position in grid coordinates
-
-    Returns:
-        path: list of (row, col) tuples, or None if no path found
-    """
-    # Validate start and goal
-    if expanded_grid[start[0], start[1]] == -1:
-        print(f"Warning: Start position {start} is inside an obstacle!")
-        return None
-    if expanded_grid[goal[0], goal[1]] == -1:
-        print(f"Warning: Goal position {goal} is inside an obstacle!")
-        return None
-
-    came_from = {}
-    g_costs = {start: 0}
-    explored = set()
-
-    # Priority Queue: (f_cost, g_cost, position)
-    open_set = [(heuristic(start, goal), 0, start)]
-    current_pos = start
-
-    while open_set:
-        current_f_cost, current_g_cost, current_pos = heappop(open_set)
-
-        # Stop condition
-        if current_pos == goal:
-            break
-
-        # Optimization: Don't re-explore if we found a better path already
-        if current_pos in explored:
-            continue
-        explored.add(current_pos)
-
-        # 8-connected neighbors
-        directions = [
-            (-1, 0), (1, 0), (0, -1), (0, 1),  # Cardinal
-            (-1, -1), (-1, 1), (1, -1), (1, 1)  # Diagonal
-        ]
-
-        for dr, dc in directions:
-            nx, ny = current_pos[0] + dr, current_pos[1] + dc
-            neighbor = (nx, ny)
-
-            # Bounds Check
-            if not (0 <= nx < expanded_grid.shape[0] and 0 <= ny < expanded_grid.shape[1]):
-                continue
-
-            # Obstacle check
-            if expanded_grid[nx, ny] == -1:
-                continue
-
-            # Calculate movement cost
-            move_cost = np.sqrt(2) if (abs(dr) == 1 and abs(dc) == 1) else 1
-            tentative_g_cost = current_g_cost + move_cost
-
-            if neighbor not in g_costs or tentative_g_cost < g_costs[neighbor]:
-                g_costs[neighbor] = tentative_g_cost
-                came_from[neighbor] = current_pos
-                f_cost = tentative_g_cost + heuristic(neighbor, goal)
-                heappush(open_set, (f_cost, tentative_g_cost, neighbor))
-
-    # Reconstruct path
-    if current_pos == goal:
-        path = []
-        while current_pos != start:
-            path.append(current_pos)
-            current_pos = came_from[current_pos]
-        path.append(start)
-        path.reverse()
-        return path
-
-    return None
-
-
-def find_path_on_expanded_grid(mode, expanded_grid, start, goal):
-    """
-    Main function to find path on a pre-expanded grid.
-
-    Args:
-        mode: 0 for Dijkstra, 1 for A*
-        expanded_grid: pre-expanded occupancy grid (0=free, -1=obstacle)
-        start: (row, col) start position
-        goal: (row, col) goal position
-        display: whether to display the path visualization
-        original_grid: original grid for display (uses expanded_grid if None)
-
-    Returns:
-        real_waypts: list of [x, y] waypoints in real coordinates (meters)
-        path: full path as list of (row, col) tuples
-    """
-    if mode == 1:
-        path = a_star(expanded_grid, start, goal)
-    elif mode == 0:
-        path = dijkstra(expanded_grid, start, goal)
-    else:
-        raise ValueError("Invalid mode. Use 0 for Dijkstra, 1 for A*.")
-
-    if path:
-        simplified_path = simplify_path(path)
-        converted_simplified_path = [utils.grid_to_real(p) for p in simplified_path]
-        real_waypts = [[float(wp[0]), float(wp[1])] for wp in converted_simplified_path]
-        return real_waypts
-    else:
-        print("No path found.")
-        return None
-
 
 # ============================================================
 #  PATH SIMPLIFICATION into waypoints
