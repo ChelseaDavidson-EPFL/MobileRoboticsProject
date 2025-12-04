@@ -61,3 +61,40 @@ def grid_to_real(coord):
     x_cm = (col + 0.5) * cell_size_cm
     y_cm = (GRID_DIM - 1 - row + 0.5) * cell_size_cm
     return (x_cm, y_cm)
+
+# ============================================================
+#  TEST GRID FOR DEMONSTRATIONS
+# ============================================================
+def create_test_grid():
+    """
+    Creates a 200x200 test grid with obstacles for testing path planning.
+    Returns a grid where 0 = free space, -1 = obstacle.
+    """
+    import numpy as np
+    
+    grid = np.zeros((GRID_DIM, GRID_DIM), dtype=int)
+    
+    # Add rectangular obstacles
+    # Obstacle 1: Large rectangle in top-left
+    grid[30:80, 40:90] = -1
+    
+    # Obstacle 2: Horizontal wall in middle
+    # grid[90:100, 60:140] = -1
+    
+    # Obstacle 3: Vertical wall on right side
+    grid[50:150, 160:170] = -1
+    
+    # Obstacle 4: Small square near bottom
+    grid[140:160, 80:100] = -1
+    
+    # Obstacle 5: L-shaped obstacle
+    grid[120:140, 120:140] = -1
+    grid[120:160, 120:130] = -1
+    
+    # Obstacle 6: Scattered small obstacles
+    grid[60:65, 150:155] = -1
+    grid[110:115, 30:35] = -1
+    grid[170:175, 110:115] = -1
+    
+    return grid
+
