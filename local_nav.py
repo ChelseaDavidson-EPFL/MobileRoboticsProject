@@ -7,16 +7,18 @@ import utils
 # ============================================================
 #  CONSTANTS FOR LOCAL NAVIGATION
 # ============================================================
-GLOBAL_IR_THLD = 4000   # IR threshold for obstacle detection in global navigation mode
+GLOBAL_IR_THLD = 3500   # IR threshold for obstacle detection in global navigation mode
 LOCAL_IR_THLD = 2000    # IR threshold for obstacle detection in local navigation mode
 
 K_AVOID  = 100          # Proportional gain for obstacle avoidance speed adjustment
 K_BREAK = 1200          # Braking constant (unused)
-FWD_SPEED = 150         # Forward speed during obstacle avoidance
-ROT_SPEED = 90          # Rotation speed when turning
+FWD_SPEED = 120         # Forward speed during obstacle avoidance
+ROT_SPEED = 80          # Rotation speed when turning
 MAX_IR_VAL = 5000       # Maximum IR sensor value for normalization
 DIS_THLD = 2000         # Distance threshold (unused)
-ADVENCE_DIST = utils.ROBOT_H  # Distance to advance after clearing obstacle
+ADVENCE_DIST1 = 3*utils.ROBOT_H / 4  # Initial distance to advance after clearing obstacle
+ADVENCE_DIST2 = 3*utils.ROBOT_H / 2  # Second distance to advance after clearing obstacle
+MAX_ROT_ANGLE = 1.7    # Maximum angle difference to resume global navigation (radians)
 
 KIDNAP_THRESHOLD = 100  # Below this value = robot is lifted (no ground detected)
 GROUND_THRESHOLD = 700  # Above this value = robot is back on ground
@@ -80,70 +82,56 @@ def avoid_obstacle(thym: Thymio, avoid_right: bool,  stage=0, pos_at_obst=[], an
         # Avoid RIGHT: keep obstacle on LEFT (sensor 0)
         match stage:
             case 0:
-                if(ir_sens[0]==0 or sum(ir_sens[1:5])>0):
+                if(sum(ir_sens)>0):
                     thym.set_motor_speeds([ROT_SPEED, -ROT_SPEED])
                     print(f"IR left: {ir_sens[0]}")
                 else:
+                    pos_at_obst = thym.pos.copy()
                     stage=1
             case 1:
-                if(sum(ir_sens[0:5])<=0):
-                    pos_at_obst = thym.pos.copy()
+                thym.set_motor_speeds([FWD_SPEED, FWD_SPEED])
+                dis_from_obst = math.sqrt((thym.pos[0]-pos_at_obst[0])**2 + (thym.pos[1]-pos_at_obst[1])**2)
+                if(dis_from_obst>=ADVENCE_DIST1):
                     stage=2
-                else:
-                    if(ir_sens[0] > max(ir_sens[1:5])):
-                        thym.set_motor_speeds([FWD_SPEED, int(FWD_SPEED-K_AVOID*max(ir_sens[1:5])/MAX_IR_VAL)])
-                    else:
-                        thym.set_motor_speeds([int(FWD_SPEED-K_AVOID*ir_sens[0]/MAX_IR_VAL), FWD_SPEED])
-            case 2:
-                thym.set_motor_speeds([FWD_SPEED, FWD_SPEED])
-                dis_from_obst = math.sqrt((thym.pos[0]-pos_at_obst[0])**2 + (thym.pos[1]-pos_at_obst[1])**2)
-                if(dis_from_obst>=4*ADVENCE_DIST/3):
-                    stage=3
                     angle_at_obst = thym.orient
-            case 3:
+            case 2:
                 thym.set_motor_speeds([-ROT_SPEED, ROT_SPEED])
-                if(ir_sens[0]>0):
+                dif_angle = thym.orient - angle_at_obst
+                if(ir_sens[0]>0 or abs(dif_angle)>=MAX_ROT_ANGLE):
                     pos_at_obst = thym.pos.copy()
-                    stage=4
-            case 4: 
+                    stage=3
+            case 3: 
                 thym.set_motor_speeds([FWD_SPEED, FWD_SPEED])
                 dis_from_obst = math.sqrt((thym.pos[0]-pos_at_obst[0])**2 + (thym.pos[1]-pos_at_obst[1])**2)
-                if(dis_from_obst>=2*ADVENCE_DIST/3):
+                if(dis_from_obst>=ADVENCE_DIST2):
                     thym.stop()
                     return True, 0, [0,0], 0
     else:
         # Avoid LEFT: keep obstacle on RIGHT (sensor 4)
         match stage:
             case 0:
-                if(ir_sens[4]==0 or sum(ir_sens[0:4])>0):
+                if(sum(ir_sens)>0):
                     thym.set_motor_speeds([-ROT_SPEED, ROT_SPEED])
                     print(f"IR right: {ir_sens[4]}")
                 else:
+                    pos_at_obst = thym.pos.copy()
                     stage=1
             case 1:
-                if(sum(ir_sens[0:5])<=0):
-                    pos_at_obst = thym.pos.copy()
+                thym.set_motor_speeds([FWD_SPEED, FWD_SPEED])
+                dis_from_obst = math.sqrt((thym.pos[0]-pos_at_obst[0])**2 + (thym.pos[1]-pos_at_obst[1])**2)
+                if(dis_from_obst>=ADVENCE_DIST1):
                     stage=2
-                else:
-                    if(ir_sens[4] > max(ir_sens[0:4])):
-                        thym.set_motor_speeds([int(FWD_SPEED-K_AVOID*max(ir_sens[0:4])/MAX_IR_VAL), FWD_SPEED])
-                    else:
-                        thym.set_motor_speeds([FWD_SPEED, int(FWD_SPEED-K_AVOID*ir_sens[4]/MAX_IR_VAL)])
-            case 2:
-                thym.set_motor_speeds([FWD_SPEED, FWD_SPEED])
-                dis_from_obst = math.sqrt((thym.pos[0]-pos_at_obst[0])**2 + (thym.pos[1]-pos_at_obst[1])**2)
-                if(dis_from_obst>=4*ADVENCE_DIST/3):
-                    stage=3
                     angle_at_obst = thym.orient
-            case 3:
+            case 2:
                 thym.set_motor_speeds([ROT_SPEED, -ROT_SPEED])
-                if(ir_sens[4]>0):
+                dif_angle = thym.orient - angle_at_obst
+                if(ir_sens[4]>0 or abs(dif_angle)>=MAX_ROT_ANGLE):
                     pos_at_obst = thym.pos.copy()
-                    stage=4
-            case 4: 
+                    stage=3
+            case 3: 
                 thym.set_motor_speeds([FWD_SPEED, FWD_SPEED])
                 dis_from_obst = math.sqrt((thym.pos[0]-pos_at_obst[0])**2 + (thym.pos[1]-pos_at_obst[1])**2)
-                if(dis_from_obst>=2*ADVENCE_DIST/3):
+                if(dis_from_obst>=ADVENCE_DIST2):
                     thym.stop()
                     return True, 0, [0,0], 0
     
