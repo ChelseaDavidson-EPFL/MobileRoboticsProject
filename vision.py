@@ -14,7 +14,7 @@ Setup notes:
 - ID 2 must go top right
 
 Usage notes:
-- Heading angle is in rads between [-pi, pi] where east is 0 rads
+- Heading angle is in rads between (-pi, pi] where east is 0 rads
 - Real positions are in meters
 - Uses a Windows only backend 
 """
@@ -140,8 +140,10 @@ class Vision:
 
     def createGrid(self, arena_w, arena_h, obstacles):
         """
-       Creates a grid in world frame coordinates where the bottom left corner of the arena is 0,0 so the top right corner
-       will be arena_w, arena_h. Both the robot position and obstacle_polygons are relative to this 0,0 frame. The grid has (0=free, -1=obstacle) using matplotlib.path.Path.
+        Creates a grid in world frame coordinates where the bottom left corner of the arena is 0,0 so the top right corner will be arena_w, arena_h.
+        Both the robot position and obstacle_polygons are relative to this 0,0 frame. The grid has (0=free, -1=obstacle) using matplotlib.path.Path.
+
+        Credit: Quitterie
         """
         self.cell_size_cm = (arena_w/self.grid_dim)*100
         cell_size_m = self.cell_size_cm/100
@@ -290,7 +292,7 @@ class Vision:
             print(f"Missing arena markers: found ID {ids}, expected IDs 1 and 2")
             return None, None, None
 
-        # Find pixel centers of markers
+        # Find corners of markers
         idx_bl = list(ids).index(1) # Bottom left arena marker
         idx_tr = list(ids).index(2) # Top right arena marker
 
@@ -566,7 +568,7 @@ class Vision:
         """
         X, Y = global_point
 
-        # We need H⁻¹ to go from world → pixel
+        # We need H⁻¹ to go from world to pixel
         H_inv = np.linalg.inv(H)
 
         pt = np.array([X, Y, 1.0])
@@ -603,7 +605,7 @@ class Vision:
         Convert a list of pixel-based polygons into world coordinates.
 
         Returns:
-            world_polygons: a list of polygons who's vertices are in world coordinates (meters).
+            world_polygons: a list of polygons whose vertices are in world coordinates (meters).
         """
         # Compute homography
         H = self.computeHomography(self.arena_corners_pixels, self.arena_width_m, self.arena_height_m)
@@ -616,7 +618,7 @@ class Vision:
                 X, Y = self.pixelToGlobal(H, (u, v))
                 world_poly.append([X, Y])
 
-            # Convert each polygon separately → (N,1,2)
+            # Convert each polygon separately - (N,1,2)
             poly_np = np.array(world_poly, dtype=np.float32).reshape(-1, 1, 2)
             world_polygons.append(poly_np)
 
@@ -652,7 +654,7 @@ class Vision:
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
 
         # Find contours
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE) # RETR_EXTERNAL: retrieve only the outermost contours, CHAIN_APPROX_NONE: no compression
 
         polygons = []
 
@@ -724,9 +726,9 @@ class Vision:
         
     def visualiseGoalPos(self, vis, goal_marker_corners, goal_center_cam_x, goal_center_cam_y, goal_center_world_x, goal_center_world_y):
         """
-        Draws a bounding box around the goal marker and highlight's the center position in the vis frame
+        Draws a bounding box around the goal marker and highlights the center position in the vis frame.
         """
-         # Draw ArUco marker location
+        # Draw ArUco marker location
         int_corners = goal_marker_corners.astype(np.int32)
         cv2.polylines(vis, [int_corners], True, (255, 0, 0), 3)
 
