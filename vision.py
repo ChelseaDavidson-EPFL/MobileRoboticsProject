@@ -858,10 +858,10 @@ if __name__ == "__main__":
     #     visionInstance.visualiseArena(vis, visionInstance.arena_corners_pixels)
 
         # --- Always detect and draw robot pose ---
-        position, robot_heading_angle = visionInstance.getRobotPoseAndVisualise(frame, vis)
-        if (position is None or robot_heading_angle is None):
-            continue
-        [X, Y] = position
+        # position, robot_heading_angle = visionInstance.getRobotPoseAndVisualise(frame, vis)
+        # if (position is None or robot_heading_angle is None):
+        #     continue
+        # [X, Y] = position
         # print(f"X: {X:.5f}, Y: {Y:.5f}, Direction: {robot_heading_angle:.5f}")
 
     #     path = [[X*100, Y*100], [40, 40], [50, 60], [70, 70]]
