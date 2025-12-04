@@ -1,19 +1,18 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
-from matplotlib.path import Path # Used for robust grid creation
 from heapq import heappush, heappop
 import utils
 import cv2
+import utils
 
 
 # ============================================================
 #  HEURISTIC (Octile Distance)
 # ============================================================
-def heuristic(a, b):
-    # a and b are (row, col)
-    dx = abs(a[0] - b[0])
-    dy = abs(a[1] - b[1])
+def heuristic(r, c):
+    dx = abs(r[0] - c[0])
+    dy = abs(r[1] - c[1])
     # D = 1, D_diag = sqrt(2)
     return max(dx, dy) + (np.sqrt(2) - 1) * min(dx, dy)
 
@@ -22,28 +21,20 @@ def heuristic(a, b):
 # ============================================================
 def display_map(map_grid, path, simplified_path, start, goal):
     # Define colors for the grid
-    cmap = ListedColormap(['white', 'black', 'blue', 'green', 'red'])
+    cmap = ListedColormap(['white', 'blue', 'red'])
     map_display = np.zeros_like(map_grid, dtype=object)
 
     # Colors
     map_display[map_grid == -1] = 'red'  # Obstacle
     map_display[map_grid == 0] = 'white'   # Free Space
 
-    # Explored cells (only mark if it was free space)
-    """ for position in explored:
-        if map_display[position] == 'white':
-            map_display[position] = 'grey' """
-
     # Path
     for position in path:
         if map_display[position] in 'white':
             map_display[position] = 'blue'
 
-    
-
     # Convert color names to numbers
-    color_mapping = {'white': 0, 'black': 1, 'blue': 2,
-                     'green': 3, 'red': 4, 'grey': 5}
+    color_mapping = {'white': 0, 'blue': 1, 'red': 2}
     map_numeric_display = np.vectorize(color_mapping.get)(map_display)
 
     # Show map 
@@ -64,7 +55,7 @@ def display_map(map_grid, path, simplified_path, start, goal):
     # Grid lines
     ax.set_xticks(np.arange(-0.5, map_grid.shape[1], 1), minor=True)
     ax.set_yticks(np.arange(-0.5, map_grid.shape[0], 1), minor=True)
-    ax.grid(which='minor', color='gray', linestyle='-', linewidth=0.15)
+    ax.grid(which='minor', color='grey', linestyle='-', linewidth=0.15)
     plt.title("Pathfinding | Full Path & Simplified Waypoints")
 
     # Draw robot footprint at each path cell
@@ -108,7 +99,7 @@ def display_map(map_grid, path, simplified_path, start, goal):
 # display only map
 # ============================================================
 def display_grid(map_grid, start=None, goal=None):
-    cmap = ListedColormap(['white', 'black', 'red', 'green', 'blue'])
+    cmap = ListedColormap(['white', 'red', 'green', 'blue'])
     map_display = np.zeros_like(map_grid, dtype=object)
 
     # Colors
@@ -121,8 +112,7 @@ def display_grid(map_grid, start=None, goal=None):
         map_display[goal] = 'green'
 
     # Convert color names to numbers
-    color_mapping = {'white': 0, 'black': 1, 'red': 2, 'blue': 3,
-                     'green': 4}
+    color_mapping = {'white': 0, 'red': 1, 'green': 2, 'blue': 3}
     map_numeric_display = np.vectorize(color_mapping.get)(map_display)
 
     # Show map
@@ -154,7 +144,7 @@ def display_grid(map_grid, start=None, goal=None):
 #  GRID EXPANSION using cv2 dilation (for expanded_dijkstra)
 # ============================================================
 
-def expand_grid_by_robot(grid, robot_size_cells, safety_margin=0):
+def expand_grid_by_robot(grid, robot_size_cells):
     """
     Expands obstacles in the grid by dilating them using cv2.
     This effectively grows obstacles by robot_size_cells/2 in all directions.
@@ -169,13 +159,9 @@ def expand_grid_by_robot(grid, robot_size_cells, safety_margin=0):
     # Convert to binary image (255 = obstacle, 0 = free)
     binary = np.where(grid == -1, 255, 0).astype(np.uint8)
 
-    # Circular kernel option
-    #kernel_size = max(1, int(robot_size_cells / 2))
-    #kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size * 2 + 1, kernel_size * 2 + 1))
-
-    # Rectangular kernel option
-    kernel_size = max(1, int(robot_size_cells / 2)+safety_margin)
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_size * 2 + 1, kernel_size * 2 + 1))
+    # Circular kernel
+    kernel_size = max(1, int(robot_size_cells / 2)+utils.SAFETY_MARGIN)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size * 2 + 1, kernel_size * 2 + 1))
 
     # Dilate obstacles
     dilated = cv2.dilate(binary, kernel, iterations=1)
@@ -205,7 +191,7 @@ def expanded_a_star(grid, start, goal):
     """
     # Get robot size in cells and expand obstacles
     robot_size_cells = utils.cm_to_cell(max(utils.ROBOT_H, utils.ROBOT_W))
-    expanded_grid = expand_grid_by_robot(grid, robot_size_cells, 6)
+    expanded_grid = expand_grid_by_robot(grid, robot_size_cells)
 
     came_from = {}
     g_costs = {start: 0}
@@ -216,7 +202,7 @@ def expanded_a_star(grid, start, goal):
     current_pos = start
 
     while open_set:
-        current_f_cost, current_g_cost, current_pos = heappop(open_set)
+        _, current_g_cost, current_pos = heappop(open_set)
 
         # Stop condition
         if current_pos == goal:
@@ -287,7 +273,7 @@ def expanded_dijkstra(grid, start, goal):
     robot_size_cells = utils.cm_to_cell(max(utils.ROBOT_H, utils.ROBOT_W))
 
     # Expand obstacles by robot size using cv2 dilation
-    expanded_grid = expand_grid_by_robot(grid, robot_size_cells, 5)
+    expanded_grid = expand_grid_by_robot(grid, robot_size_cells)
 
     # Run Dijkstra (robot as point)
     came_from = {}
@@ -350,7 +336,6 @@ def expanded_dijkstra(grid, start, goal):
 
     return None, expanded_grid
 
-
 # ============================================================
 #  PATH SIMPLIFICATION into waypoints
 # ============================================================
@@ -388,12 +373,122 @@ def simplify_path(full_path):
 #  EXECUTION 
 # ============================================================
 
+# ============================================================
+#  PLOT PATH WITH ROBOT TRAJECTORY
+# ============================================================
+# def plot_path_with_trajectory(grid, path, robot_positions, start, goal, fig=None, ax=None):
+#     """
+#     Plots the planned path and the actual trajectory of the robot.
+#     Updates the same plot instead of creating a new one.
+    
+#     Args:
+#         grid: occupancy grid (0=free, -1=obstacle)
+#         path: planned path as list of (row, col) waypoints
+#         robot_positions: list of (x_cm, y_cm) actual robot positions
+#         start: (row, col) start position in grid
+#         goal: (row, col) goal position in grid
+#         fig: matplotlib figure to update (optional)
+#         ax: matplotlib axes to update (optional)
+    
+#     Returns:
+#         fig, ax: the updated figure and axes
+#     """
+#     # Define colors for the grid (show obstacles in red)
+#     cmap = ListedColormap(['white', 'black', 'blue', 'green', 'red', 'orange'])
+#     map_display = np.zeros_like(grid, dtype=int)
+
+#     # Initialize all as white
+#     map_display[:] = 0
+    
+#     # Mark obstacles in RED (index 4)
+#     obstacle_mask = (grid == -1)
+#     map_display[obstacle_mask] = 4  # Red for obstacles
+
+#     # Don't mark path cells in the grid - we'll draw lines instead
+    
+#     map_numeric_display = map_display
+
+#     # Create or clear the axes
+#     if ax is None:
+#         fig, ax = plt.subplots(figsize=(8, 8))
+#     else:
+#         ax.clear()
+    
+#     ax.imshow(map_numeric_display, cmap=cmap)
+
+#     # Set tick positions
+#     x_positions = np.arange(0, 201, 20)
+#     y_positions = np.arange(0, 201, 20)
+#     x_labels = [int(utils.cell_to_cm(col)) for col in x_positions]
+#     y_labels = [int(utils.arena_height_cm - utils.cell_to_cm(row)) for row in y_positions]
+
+#     ax.set_xticks(x_positions)
+#     ax.set_xticklabels(x_labels)
+#     ax.set_yticks(y_positions)
+#     ax.set_yticklabels(y_labels)
+#     ax.set_xlabel('X Dimension (cm)')
+#     ax.set_ylabel('Y Dimension (cm)')
+    
+#     # Grid lines
+#     ax.set_xticks(np.arange(-0.5, grid.shape[1], 1), minor=True)
+#     ax.set_yticks(np.arange(-0.5, grid.shape[0], 1), minor=True)
+#     ax.grid(which='minor', color='gray', linestyle='-', linewidth=0.15)
+#     ax.set_title("Path Planning with Robot Trajectory")
+
+#     # Start and Goal
+#     ax.scatter(start[1], start[0], s=300, c="blue", label="Start", zorder=6)
+#     ax.scatter(goal[1], goal[0], s=300, c="green", label="Goal", zorder=6)
+    
+#     # Plot planned path as connected line
+#     if path and len(path) > 0:
+#         path_cols = [p[1] for p in path]  # Column (X)
+#         path_rows = [p[0] for p in path]  # Row (Y)
+        
+#         ax.plot(
+#             path_cols,
+#             path_rows,
+#             '-',                # Line style
+#             color='blue',       # Color of the path
+#             linewidth=1,        # Line width
+#             alpha=0.6,          # Transparency
+#             label='Planned Path',
+#             zorder=3            # Under trajectory
+#         )
+    
+#     # Plot actual robot trajectory (in cm, convert to grid coordinates for display)
+#     if robot_positions and len(robot_positions) > 0:
+#         # Convert real cm positions to continuous grid coordinates (not discrete cells)
+#         trajectory_cols = [pos[0] / utils.cell_size_cm for pos in robot_positions]  # X in cm -> continuous col
+#         trajectory_rows = [utils.GRID_DIM - (pos[1] / utils.cell_size_cm) for pos in robot_positions]  # Y in cm -> continuous row (inverted)
+        
+#         ax.plot(
+#             trajectory_cols,
+#             trajectory_rows,
+#             '-',                # Line style
+#             color='orange',     # Color of the trajectory
+#             linewidth=1,        # Line width
+#             label='Robot Trajectory',
+#             zorder=4            # Ensure line is on top
+#         )
+        
+#         # Mark current position with a larger dot
+#         if len(trajectory_cols) > 0:
+#             ax.scatter(trajectory_cols[-1], trajectory_rows[-1], s=200, c="orange", 
+#                       edgecolors='black', linewidths=2, zorder=5, label="Current Position")
+    
+#     ax.legend()
+#     plt.draw()
+#     plt.pause(0.001)  # Small pause to update the plot
+    
+#     return fig, ax
+
+
 def find_path(mode, grid, start, goal):
     """
     Main function to find path using specified mode.
 
     Args:
-        mode: 'a_star' or 'dijkstra'
+        mode: 0 or 1 
         grid: occupancy grid (0=free, -1=obstacle)
         start: (row, col) start position
         goal: (row, col) goal position
@@ -407,19 +502,14 @@ def find_path(mode, grid, start, goal):
 
     if path:
         simplified_path = simplify_path(path)
-    
-        # print("--- Pathfinding Results ---")
-        # print(f"Start: {start}, Goal: {goal}")
-        # print(f"Simplified Path (in grid): {simplified_path}")
         converted_simplified_path = [utils.grid_to_real(p) for p in simplified_path]
-        # print("Simplified Path Waypoints (real cm):", converted_simplified_path)
         real_waypts = [[float(wp[0]), float(wp[1])] for wp in converted_simplified_path]
-        # print("------------------------------")
-
         display_map(grid, path, simplified_path, start, goal)
+        return real_waypts, expanded_grid
     else:
         simplified_path = None
         print("No path found.")
+        return None, expanded_grid
 
-    return real_waypts, expanded_grid
+    
 

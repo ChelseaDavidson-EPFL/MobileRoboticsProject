@@ -123,7 +123,7 @@ class Vision:
             # 6. Create and store occupancy grid
             # ----------------------------
             self.createGrid(self.arena_width_m, self.arena_height_m, global_polygons)
- 
+           
             # ----------------------------
             # 7. Visualisations
             # ----------------------------
@@ -140,10 +140,8 @@ class Vision:
 
     def createGrid(self, arena_w, arena_h, obstacles):
         """
-        Creates a grid in world frame coordinates where the bottom left corner of the arena is 0,0 so the top right corner will be arena_w, arena_h.
-        Both the robot position and obstacle_polygons are relative to this 0,0 frame. The grid has (0=free, -1=obstacle) using matplotlib.path.Path.
-
-        Credit: Quitterie
+       Creates a grid in world frame coordinates where the bottom left corner of the arena is 0,0 so the top right corner
+       will be arena_w, arena_h. Both the robot position and obstacle_polygons are relative to this 0,0 frame. The grid has (0=free, -1=obstacle) using matplotlib.path.Path.
         """
         self.cell_size_cm = (arena_w/self.grid_dim)*100
         cell_size_m = self.cell_size_cm/100
@@ -654,7 +652,7 @@ class Vision:
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
 
         # Find contours
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE) # RETR_EXTERNAL: retrieve only the outermost contours, CHAIN_APPROX_NONE: no compression
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
         polygons = []
 
@@ -763,7 +761,7 @@ class Vision:
             return
                 
         # Draw the point on the image
-        cv2.circle(vis, (int(camera_x), int(camera_y)), 3, colour, -1)
+        cv2.circle(vis, (int(camera_x), int(camera_y)), 2, colour, -1)
 
     def visualiseGlobalPath(self, vis, path_waypoints, colour=(0, 255, 0), max_points=200):
         """
@@ -848,16 +846,16 @@ if __name__ == "__main__":
         print("Error: Could not access the webcam.")
         exit()
 
-    while True:
-        ret, frame = visionInstance.cap.read()
-        if not ret:
-            print("Camera failed to capture the frame.")
-            break
+    # while True:
+    #     ret, frame = visionInstance.cap.read()
+    #     if not ret:
+    #         print("Camera failed to capture the frame.")
+    #         break
 
-        vis = frame.copy()
+    #     vis = frame.copy()
 
-        # --- Always redraw arena outline ---
-        visionInstance.visualiseArena(vis, visionInstance.arena_corners_pixels)
+    #     # --- Always redraw arena outline ---
+    #     visionInstance.visualiseArena(vis, visionInstance.arena_corners_pixels)
 
         # --- Always detect and draw robot pose ---
         position, robot_heading_angle = visionInstance.getRobotPoseAndVisualise(frame, vis)
@@ -866,15 +864,15 @@ if __name__ == "__main__":
         [X, Y] = position
         # print(f"X: {X:.5f}, Y: {Y:.5f}, Direction: {robot_heading_angle:.5f}")
 
-        path = [[X*100, Y*100], [40, 40], [50, 60], [70, 70]]
-        visionInstance.visualiseGlobalPath(vis, path)
+    #     path = [[X*100, Y*100], [40, 40], [50, 60], [70, 70]]
+    #     visionInstance.visualiseGlobalPath(vis, path)
 
-        # --- Show the live window ---
-        cv2.imshow("Live Robot Pose", vis)
+    #     # --- Show the live window ---
+    #     cv2.imshow("Live Robot Pose", vis)
 
-        # Exit on Q
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+    #     # Exit on Q
+    #     if cv2.waitKey(1) & 0xFF == ord('q'):
+    #         break
 
     visionInstance.cap.release()
     cv2.destroyAllWindows()
