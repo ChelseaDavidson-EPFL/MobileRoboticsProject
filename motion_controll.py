@@ -5,7 +5,7 @@ from thymio import Thymio
 #radius around witch the goal is reached (in cm)
 GOAL_RADUIS = 2.5
 # Forward speed
-FWD_SPEED = 150
+FWD_SPEED = 120
 # Rotation speed
 ROT_SPEED = 100
 # angle at witch it starts to go forward
