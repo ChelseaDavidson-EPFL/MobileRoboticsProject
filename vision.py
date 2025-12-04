@@ -423,7 +423,7 @@ class Vision:
     
     def getGoalPosCameraFrame(self, image):
         """
-        Detects ONLY ArUco marker with ID 3.
+        Detects only ArUco marker with ID 3.
         Returns:
         - center pixel (cx, cy)
         - 4 corner points (TL, TR, BR, BL)
@@ -566,7 +566,7 @@ class Vision:
         # Convert to HSV
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-        # --- Red spans the start and end of the hue circle ---
+        # Red spans the start and end of the hue circle so need 2 upper and lower bounds
         lower_red1 = np.array([0, 70, 50])
         upper_red1 = np.array([10, 255, 255])
 
@@ -584,18 +584,18 @@ class Vision:
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
 
         # Find contours
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE) # RETR_EXTERNAL: retrieve only the outermost contours, CHAIN_APPROX_SIMPLE: compresses the contour by storing only corner points
 
         polygons = []
 
         for cnt in contours:
             # Filter out small artifacts
-            if cv2.contourArea(cnt) < 100:
+            if cv2.contourArea(cnt) < 100: # Computes area enclosed by the contours in pixels - rejects anything less than 100 pixels to eliminate small noise
                 continue
 
             # Approximate to polygon
-            epsilon = 0.02 * cv2.arcLength(cnt, True)
-            poly = cv2.approxPolyDP(cnt, epsilon, True)
+            epsilon = 0.02 * cv2.arcLength(cnt, True) # Use 2% of the contour perimiter as the tolerance for simplification (smaller epsilon = more detailed)
+            poly = cv2.approxPolyDP(cnt, epsilon, True) # Uses the Ramer–Douglas–Peucker algorithm to produce a polygon with fewer vertices while approximating the original shape
 
             # Convert polygon format for output
             polygon_points = [(int(p[0][0]), int(p[0][1])) for p in poly]
