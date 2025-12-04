@@ -141,7 +141,7 @@ def display_grid(map_grid, start=None, goal=None):
 
 
 # ============================================================
-#  GRID EXPANSION using cv2 dilation (for expanded_dijkstra)
+#  GRID EXPANSION using cv2 dilation
 # ============================================================
 
 def expand_grid_by_robot(grid, robot_size_cells):
