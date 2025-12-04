@@ -576,7 +576,7 @@ class Vision:
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
 
         # Find contours
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
         polygons = []
 
@@ -586,7 +586,7 @@ class Vision:
                 continue
 
             # Approximate to polygon
-            epsilon = 0.02 * cv2.arcLength(cnt, True)
+            epsilon = 0.001 * cv2.arcLength(cnt, True)
             poly = cv2.approxPolyDP(cnt, epsilon, True)
 
             # Convert polygon format for output
@@ -740,32 +740,32 @@ if __name__ == "__main__":
         print("Error: Could not access the webcam.")
         exit()
 
-    while True:
-        ret, frame = visionInstance.cap.read()
-        if not ret:
-            print("Camera failed to capture the frame.")
-            break
+    # while True:
+    #     ret, frame = visionInstance.cap.read()
+    #     if not ret:
+    #         print("Camera failed to capture the frame.")
+    #         break
 
-        vis = frame.copy()
+    #     vis = frame.copy()
 
-        # --- Always redraw arena outline ---
-        visionInstance.visualiseArena(vis, visionInstance.arena_corners_pixels)
+    #     # --- Always redraw arena outline ---
+    #     visionInstance.visualiseArena(vis, visionInstance.arena_corners_pixels)
 
-        # --- Always detect and draw robot pose ---
-        [X, Y], robot_heading_angle = visionInstance.getRobotPoseAndVisualise(frame, vis)
-        if (X is None or Y is None or robot_heading_angle is None):
-            continue
-        # print(f"X: {X:.5f}, Y: {Y:.5f}, Direction: {robot_heading_angle:.5f}")
+    #     # --- Always detect and draw robot pose ---
+    #     [X, Y], robot_heading_angle = visionInstance.getRobotPoseAndVisualise(frame, vis)
+    #     if (X is None or Y is None or robot_heading_angle is None):
+    #         continue
+    #     # print(f"X: {X:.5f}, Y: {Y:.5f}, Direction: {robot_heading_angle:.5f}")
 
-        path = [[X*100, Y*100], [40, 40], [50, 60], [70, 70]]
-        visionInstance.visualiseGlobalPath(vis, path)
+    #     path = [[X*100, Y*100], [40, 40], [50, 60], [70, 70]]
+    #     visionInstance.visualiseGlobalPath(vis, path)
 
-        # --- Show the live window ---
-        cv2.imshow("Live Robot Pose", vis)
+    #     # --- Show the live window ---
+    #     cv2.imshow("Live Robot Pose", vis)
 
-        # Exit on Q
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+    #     # Exit on Q
+    #     if cv2.waitKey(1) & 0xFF == ord('q'):
+    #         break
 
     visionInstance.cap.release()
     cv2.destroyAllWindows()

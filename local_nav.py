@@ -4,28 +4,77 @@ import numpy as np
 import math
 import utils
 
-GLOBAL_IR_THLD = 4000
-LOCAL_IR_THLD = 2000
+# ============================================================
+#  CONSTANTS FOR LOCAL NAVIGATION
+# ============================================================
+GLOBAL_IR_THLD = 3500   # IR threshold for obstacle detection in global navigation mode
+LOCAL_IR_THLD = 2000    # IR threshold for obstacle detection in local navigation mode
 
-K_AVOID  = 100
-K_BREAK = 1200
-FWD_SPEED = 150
-ROT_SPEED = 90
-MAX_IR_VAL = 5000
-DIS_THLD = 2000
-ADVENCE_DIST = utils.ROBOT_H
+K_AVOID  = 100          # Proportional gain for obstacle avoidance speed adjustment
+K_BREAK = 1200          # Braking constant (unused)
+FWD_SPEED = 120         # Forward speed during obstacle avoidance
+ROT_SPEED = 80          # Rotation speed when turning
+MAX_IR_VAL = 5000       # Maximum IR sensor value for normalization
+DIS_THLD = 2000         # Distance threshold (unused)
+ADVENCE_DIST1 = 3*utils.ROBOT_H / 4  # Initial distance to advance after clearing obstacle
+ADVENCE_DIST2 = 3*utils.ROBOT_H / 2  # Second distance to advance after clearing obstacle
+MAX_ROT_ANGLE = 1.7    # Maximum angle difference to resume global navigation (radians)
+LAT_DIS_ANALYSE = 50
+FORW_DEP_ANALYSE = 30
 
 KIDNAP_THRESHOLD = 100  # Below this value = robot is lifted (no ground detected)
 GROUND_THRESHOLD = 700  # Above this value = robot is back on ground
 
+
+# ============================================================
+#  OBSTACLE DETECTION
+# ============================================================
 def is_object(thym: Thymio):
+    """
+    Checks if an obstacle is detected by the IR sensors.
+    Uses different thresholds depending on navigation mode.
+
+    Args:
+        thym: Thymio robot instance with IR sensor data
+
+    Returns:
+        bool: True if obstacle detected, False otherwise
+    """
     ir_max = max(thym.ir_sensors)
     if(thym.nav_mode == "GLOBAL" and ir_max > GLOBAL_IR_THLD or
        thym.nav_mode == "LOCAL" and ir_max > LOCAL_IR_THLD):
         return True
     return False
 
+
+# ============================================================
+#  OBSTACLE AVOIDANCE
+# ============================================================
 def avoid_obstacle(thym: Thymio, avoid_right: bool,  stage=0, pos_at_obst=[], angle_at_obst=0):
+    """
+    Executes a 4-stage obstacle avoidance maneuver.
+    The robot rotates away from the obstacle, advances, rotates back, and clears.
+
+    Stages:
+        0: Rotate until no IR detection (obstacle cleared from sensors)
+        1: Advance forward by ADVENCE_DIST1
+        2: Rotate back toward original path (until obstacle re-detected or max angle reached)
+        3: Final advance by ADVENCE_DIST2 to fully clear obstacle
+
+    Args:
+        thym: Thymio robot instance
+        avoid_right: True to avoid right (rotate left), False to avoid left (rotate right)
+        stage: Current stage of the avoidance maneuver (0-3)
+        pos_at_obst: Position where stage transitions occur [x_cm, y_cm]
+        angle_at_obst: Orientation saved at stage transitions
+
+    Returns:
+        tuple: (obstacle_avoided, stage, pos_at_obst, angle_at_obst)
+            - obstacle_avoided: True if avoidance maneuver is complete
+            - stage: Updated stage number (0-3)
+            - pos_at_obst: Updated position marker
+            - angle_at_obst: Updated angle marker
+    """
     ir_sens = thym.ir_sensors
     last_angle = thym.last_orient
     print(f"stage: {stage}, IR: {ir_sens}")
@@ -34,107 +83,80 @@ def avoid_obstacle(thym: Thymio, avoid_right: bool,  stage=0, pos_at_obst=[], an
         # Avoid RIGHT: keep obstacle on LEFT (sensor 0)
         match stage:
             case 0:
-                if(ir_sens[0]==0 or sum(ir_sens[1:5])>0):
+                if(sum(ir_sens)>0):
                     thym.set_motor_speeds([ROT_SPEED, -ROT_SPEED])
                     print(f"IR left: {ir_sens[0]}")
                 else:
+                    pos_at_obst = thym.pos.copy()
                     stage=1
             case 1:
-                if(sum(ir_sens[0:5])<=0):
-                    pos_at_obst = thym.pos.copy()
+                thym.set_motor_speeds([FWD_SPEED, FWD_SPEED])
+                dis_from_obst = math.sqrt((thym.pos[0]-pos_at_obst[0])**2 + (thym.pos[1]-pos_at_obst[1])**2)
+                if(dis_from_obst>=ADVENCE_DIST1):
                     stage=2
-                else:
-                    if(ir_sens[0] > max(ir_sens[1:5])):
-                        thym.set_motor_speeds([FWD_SPEED, int(FWD_SPEED-K_AVOID*max(ir_sens[1:5])/MAX_IR_VAL)])
-                    else:
-                        thym.set_motor_speeds([int(FWD_SPEED-K_AVOID*ir_sens[0]/MAX_IR_VAL), FWD_SPEED])
-            case 2:
-                thym.set_motor_speeds([FWD_SPEED, FWD_SPEED])
-                dis_from_obst = math.sqrt((thym.pos[0]-pos_at_obst[0])**2 + (thym.pos[1]-pos_at_obst[1])**2)
-                if(dis_from_obst>=4*ADVENCE_DIST/3):
-                    stage=3
                     angle_at_obst = thym.orient
-            case 3:
+            case 2:
                 thym.set_motor_speeds([-ROT_SPEED, ROT_SPEED])
-                if(ir_sens[0]>0):
+                dif_angle = thym.orient - angle_at_obst
+                if(ir_sens[0]>0 or abs(dif_angle)>=MAX_ROT_ANGLE):
                     pos_at_obst = thym.pos.copy()
-                    stage=4
-            case 4: 
+                    stage=3
+            case 3: 
                 thym.set_motor_speeds([FWD_SPEED, FWD_SPEED])
                 dis_from_obst = math.sqrt((thym.pos[0]-pos_at_obst[0])**2 + (thym.pos[1]-pos_at_obst[1])**2)
-                if(dis_from_obst>=2*ADVENCE_DIST/3):
+                if(dis_from_obst>=ADVENCE_DIST2):
                     thym.stop()
                     return True, 0, [0,0], 0
     else:
         # Avoid LEFT: keep obstacle on RIGHT (sensor 4)
         match stage:
             case 0:
-                if(ir_sens[4]==0 or sum(ir_sens[0:4])>0):
+                if(sum(ir_sens)>0):
                     thym.set_motor_speeds([-ROT_SPEED, ROT_SPEED])
                     print(f"IR right: {ir_sens[4]}")
                 else:
+                    pos_at_obst = thym.pos.copy()
                     stage=1
             case 1:
-                if(sum(ir_sens[0:5])<=0):
-                    pos_at_obst = thym.pos.copy()
+                thym.set_motor_speeds([FWD_SPEED, FWD_SPEED])
+                dis_from_obst = math.sqrt((thym.pos[0]-pos_at_obst[0])**2 + (thym.pos[1]-pos_at_obst[1])**2)
+                if(dis_from_obst>=ADVENCE_DIST1):
                     stage=2
-                else:
-                    if(ir_sens[4] > max(ir_sens[0:4])):
-                        thym.set_motor_speeds([int(FWD_SPEED-K_AVOID*max(ir_sens[0:4])/MAX_IR_VAL), FWD_SPEED])
-                    else:
-                        thym.set_motor_speeds([FWD_SPEED, int(FWD_SPEED-K_AVOID*ir_sens[4]/MAX_IR_VAL)])
-            case 2:
-                thym.set_motor_speeds([FWD_SPEED, FWD_SPEED])
-                dis_from_obst = math.sqrt((thym.pos[0]-pos_at_obst[0])**2 + (thym.pos[1]-pos_at_obst[1])**2)
-                if(dis_from_obst>=4*ADVENCE_DIST/3):
-                    stage=3
                     angle_at_obst = thym.orient
-            case 3:
+            case 2:
                 thym.set_motor_speeds([ROT_SPEED, -ROT_SPEED])
-                if(ir_sens[4]>0):
+                dif_angle = thym.orient - angle_at_obst
+                if(ir_sens[4]>0 or abs(dif_angle)>=MAX_ROT_ANGLE):
                     pos_at_obst = thym.pos.copy()
-                    stage=4
-            case 4: 
+                    stage=3
+            case 3: 
                 thym.set_motor_speeds([FWD_SPEED, FWD_SPEED])
                 dis_from_obst = math.sqrt((thym.pos[0]-pos_at_obst[0])**2 + (thym.pos[1]-pos_at_obst[1])**2)
-                if(dis_from_obst>=2*ADVENCE_DIST/3):
+                if(dis_from_obst>=ADVENCE_DIST2):
                     thym.stop()
                     return True, 0, [0,0], 0
     
     return False, stage, pos_at_obst, angle_at_obst
 
-# def avoid_obstacle(thym: Thymio, grid, avoid_right: bool):
-#     ir_sens = thym.ir_sensors
-#     left_sum = ir_sens[0]+ir_sens[1]
-#     right_sum = ir_sens[3]+ir_sens[4]
-#     fwd_speed = int(FWD_SPEED - K_BREAK*((ir_sens[1]+ir_sens[2]+ir_sens[3])/3*MAX_IR_VAL))
 
-#     if(fwd_speed<=0): 
-#         fwd_speed = 0
-            
-#     speed_L = fwd_speed
-#     speed_R = fwd_speed
-
-#     if(fwd_speed == 0 and right_sum == 0 and left_sum == 0):
-#         if(avoid_right):
-#             left_sum = 1000
-#         else:
-#             right_sum = 1000
-        
-
-#     if(left_sum > right_sum):
-#         speed_R = int(speed_R - (left_sum/MAX_IR_VAL)*K_AVOID)      
-#     else: 
-#         speed_L = int(speed_L - (right_sum/MAX_IR_VAL)*K_AVOID) 
-        
-#     thym.set_motor_speeds([speed_L, speed_R])
-#     return
-
-
+# ============================================================
+#  OBSTACLE SIDE DETECTION
+# ============================================================
 def avoid_right(thym: Thymio, grid):
     """
-    Checks if there are more obstacles to the right or left of the robot.
-    Returns True if the robot should avoid to the right (obstacle on the left).
+    Analyzes the area in front of the robot to determine which side has more obstacles.
+    Used to decide whether to follow the left or right edge of an obstacle.
+
+    The function scans a rectangular region ahead of the robot, counting obstacles
+    on each side. The robot should avoid towards the side with fewer obstacles.
+
+    Args:
+        thym: Thymio robot instance with position and orientation
+        grid: Occupancy grid (0=free, -1=obstacle)
+
+    Returns:
+        bool: True if robot should avoid right (more obstacles on left),
+              False if robot should avoid left (more obstacles on right)
     """
     # Convert Thymio position to grid coordinates
     pos_cm = (thym.pos[0], thym.pos[1])
@@ -163,16 +185,12 @@ def avoid_right(thym: Thymio, grid):
     left_row = -right_row
     
     # Check an area in front of the robot (both sides and forward)
-    lateral_distance = 50  # How far to check sideways
-    forward_depth = 30     # How far to check forward
     obstacles_right = 0
     obstacles_left = 0
     
-    # print(f"Robot at grid ({row}, {col}), orient={orient:.2f}, fwd=({fwd_row},{fwd_col}), right=({right_row},{right_col})")
-    
     # Scan an area: for each forward distance, check cells to the left and right
-    for fwd_dist in range(0, forward_depth + 1):
-        for lateral_dist in range(1, lateral_distance + 1):
+    for fwd_dist in range(0, FORW_DEP_ANALYSE):
+        for lateral_dist in range(1, LAT_DIS_ANALYSE):
             # Base position at this forward distance
             base_row = row + fwd_row * fwd_dist
             base_col = col + fwd_col * fwd_dist
@@ -192,50 +210,27 @@ def avoid_right(thym: Thymio, grid):
                     obstacles_left += 1
     
     # Return True if more obstacles on the left (so avoid to the right)
-    print(f"Obstacles in front - Left: {obstacles_left}, Right: {obstacles_right}")
     return obstacles_left >= obstacles_right
-    
-    
-    thym.set_motor_speeds([speed_L, speed_R])
-    return
 
 
+# ============================================================
+#  KIDNAP DETECTION
+# ============================================================
 def check_kidnap(thym: Thymio):
     """
-    Check if the robot has been kidnapped (lifted off the ground).
-    Ground sensors return HIGH values when close to ground, LOW values when lifted.
+    Detects if the robot has been lifted off the ground (kidnapped).
+    Uses ground sensors to detect absence of surface underneath.
+
+    Args:
+        thym: Thymio robot instance with ground sensor data
 
     Returns:
-        - "kidnapped" if robot was just lifted (transition to kidnapped state)
-        - "recovered" if robot was put back on ground (transition from kidnapped)
-        - None if no state change
+        bool: True if robot is lifted (kidnapped), False otherwise
     """
     ground_sensors = thym.get_ground_sensors()
 
+    # Check if the robot is lifted (kidnapped)
     if(max(thym.ground_sensors)<KIDNAP_THRESHOLD):
-        # print("KIDNAPPED groud sensors:", thym.ground_sensors)
         return True
     else:
-        # print("GROUND groud sensors:", thym.ground_sensors)
         return False
-
-    # # Robot is lifted when ground sensors read LOW (no ground detected)
-    # is_lifted = ground_sensors[0] < KIDNAP_THRESHOLD and ground_sensors[1] < KIDNAP_THRESHOLD
-
-    # # Robot is on ground when sensors read HIGH
-    # is_on_ground = ground_sensors[0] > GROUND_THRESHOLD and ground_sensors[1] > GROUND_THRESHOLD
-
-    # if is_lifted and not thym.is_kidnapped:
-    #     # Robot just got kidnapped
-    #     thym.is_kidnapped = True
-    #     thym.stop()
-    #     print("KIDNAPPED: Robot lifted! Motors stopped.")
-    #     return "kidnapped"
-
-    # elif is_on_ground and thym.is_kidnapped:
-    #     # Robot was put back on the ground
-    #     thym.is_kidnapped = False
-    #     print("RECOVERED: Robot back on ground. Ready to relaunch path finding.")
-    #     return "recovered"
-
-    return None
