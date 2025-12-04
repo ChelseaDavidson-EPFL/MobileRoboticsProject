@@ -19,6 +19,8 @@ DIS_THLD = 2000         # Distance threshold (unused)
 ADVENCE_DIST1 = 3*utils.ROBOT_H / 4  # Initial distance to advance after clearing obstacle
 ADVENCE_DIST2 = 3*utils.ROBOT_H / 2  # Second distance to advance after clearing obstacle
 MAX_ROT_ANGLE = 1.7    # Maximum angle difference to resume global navigation (radians)
+LAT_DIS_ANALYSE = 50
+FORW_DEP_ANALYSE = 30
 
 KIDNAP_THRESHOLD = 100  # Below this value = robot is lifted (no ground detected)
 GROUND_THRESHOLD = 700  # Above this value = robot is back on ground
@@ -50,29 +52,28 @@ def is_object(thym: Thymio):
 # ============================================================
 def avoid_obstacle(thym: Thymio, avoid_right: bool,  stage=0, pos_at_obst=[], angle_at_obst=0):
     """
-    Executes a multi-stage obstacle avoidance maneuver.
-    The robot either follows the left or right edge of an obstacle until it can resume global navigation.
+    Executes a 4-stage obstacle avoidance maneuver.
+    The robot rotates away from the obstacle, advances, rotates back, and clears.
 
     Stages:
-        0: Rotate to align with obstacle edge
-        1: Follow obstacle edge using wall-following behavior
-        2: Advance forward after clearing the obstacle
-        3: Rotate back towards original heading
-        4: Advance a bit more and finish avoidance
+        0: Rotate until no IR detection (obstacle cleared from sensors)
+        1: Advance forward by ADVENCE_DIST1
+        2: Rotate back toward original path (until obstacle re-detected or max angle reached)
+        3: Final advance by ADVENCE_DIST2 to fully clear obstacle
 
     Args:
         thym: Thymio robot instance
-        avoid_right: True to avoid right (keep obstacle on left), False to avoid left
-        stage: Current stage of the avoidance maneuver (0-4)
-        pos_at_obst: Position where obstacle was detected [x_cm, y_cm]
-        angle_at_obst: Orientation when obstacle was detected
+        avoid_right: True to avoid right (rotate left), False to avoid left (rotate right)
+        stage: Current stage of the avoidance maneuver (0-3)
+        pos_at_obst: Position where stage transitions occur [x_cm, y_cm]
+        angle_at_obst: Orientation saved at stage transitions
 
     Returns:
         tuple: (obstacle_avoided, stage, pos_at_obst, angle_at_obst)
             - obstacle_avoided: True if avoidance maneuver is complete
-            - stage: Updated stage number
-            - pos_at_obst: Updated position at obstacle
-            - angle_at_obst: Updated angle at obstacle
+            - stage: Updated stage number (0-3)
+            - pos_at_obst: Updated position marker
+            - angle_at_obst: Updated angle marker
     """
     ir_sens = thym.ir_sensors
     last_angle = thym.last_orient
@@ -184,16 +185,12 @@ def avoid_right(thym: Thymio, grid):
     left_row = -right_row
     
     # Check an area in front of the robot (both sides and forward)
-    lateral_distance = 50  # How far to check sideways
-    forward_depth = 30     # How far to check forward
     obstacles_right = 0
     obstacles_left = 0
     
-    # print(f"Robot at grid ({row}, {col}), orient={orient:.2f}, fwd=({fwd_row},{fwd_col}), right=({right_row},{right_col})")
-    
     # Scan an area: for each forward distance, check cells to the left and right
-    for fwd_dist in range(0, forward_depth + 1):
-        for lateral_dist in range(1, lateral_distance + 1):
+    for fwd_dist in range(0, FORW_DEP_ANALYSE):
+        for lateral_dist in range(1, LAT_DIS_ANALYSE):
             # Base position at this forward distance
             base_row = row + fwd_row * fwd_dist
             base_col = col + fwd_col * fwd_dist
@@ -213,7 +210,6 @@ def avoid_right(thym: Thymio, grid):
                     obstacles_left += 1
     
     # Return True if more obstacles on the left (so avoid to the right)
-    print(f"Obstacles in front - Left: {obstacles_left}, Right: {obstacles_right}")
     return obstacles_left >= obstacles_right
 
 
@@ -238,4 +234,3 @@ def check_kidnap(thym: Thymio):
         return True
     else:
         return False
-    return None
