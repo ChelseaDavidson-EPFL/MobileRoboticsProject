@@ -840,39 +840,39 @@ if __name__ == "__main__":
     visionInstance = Vision()
     print("arena width and height : ", visionInstance.arena_width_m, visionInstance.arena_height_m)
 
-    # Now start the live robot pose visualisation
-    
     if not visionInstance.cap.isOpened():
         print("Error: Could not access the webcam.")
         exit()
 
-    # while True:
-    #     ret, frame = visionInstance.cap.read()
-    #     if not ret:
-    #         print("Camera failed to capture the frame.")
-    #         break
+    # Live robot pose visualisation
+    while True:
+        ret, frame = visionInstance.cap.read()
+        if not ret:
+            print("Camera failed to capture the frame.")
+            break
 
-    #     vis = frame.copy()
+        vis = frame.copy()
 
-    #     # --- Always redraw arena outline ---
-    #     visionInstance.visualiseArena(vis, visionInstance.arena_corners_pixels)
+        # Always redraw arena outline
+        visionInstance.visualiseArena(vis, visionInstance.arena_corners_pixels)
 
-        # --- Always detect and draw robot pose ---
-        # position, robot_heading_angle = visionInstance.getRobotPoseAndVisualise(frame, vis)
-        # if (position is None or robot_heading_angle is None):
-        #     continue
-        # [X, Y] = position
+        # Always detect and draw robot pose
+        position, robot_heading_angle = visionInstance.getRobotPoseAndVisualise(frame, vis)
+        if (position is None or robot_heading_angle is None):
+            continue
+        [X, Y] = position
         # print(f"X: {X:.5f}, Y: {Y:.5f}, Direction: {robot_heading_angle:.5f}")
 
-    #     path = [[X*100, Y*100], [40, 40], [50, 60], [70, 70]]
-    #     visionInstance.visualiseGlobalPath(vis, path)
+        # Visualise a random path starting from the robot's position
+        path = [[X*100, Y*100], [40, 40], [50, 60], [70, 70]]
+        visionInstance.visualiseGlobalPath(vis, path)
 
-    #     # --- Show the live window ---
-    #     cv2.imshow("Live Robot Pose", vis)
+        # Show the live window
+        cv2.imshow("Live Robot Pose", vis)
 
-    #     # Exit on Q
-    #     if cv2.waitKey(1) & 0xFF == ord('q'):
-    #         break
+        # Exit on q
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
 
     visionInstance.cap.release()
     cv2.destroyAllWindows()
