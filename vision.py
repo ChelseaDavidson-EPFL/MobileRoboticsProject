@@ -654,7 +654,7 @@ class Vision:
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
 
         # Find contours
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE) # RETR_EXTERNAL: retrieve only the outermost contours, CHAIN_APPROX_SIMPLE: compresses the contour by storing only corner points
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE) # RETR_EXTERNAL: retrieve only the outermost contours, CHAIN_APPROX_NONE: no compression
 
         polygons = []
 
@@ -664,7 +664,7 @@ class Vision:
                 continue
 
             # Approximate to polygon
-            epsilon = 0.02 * cv2.arcLength(cnt, True) # Use 2% of the contour perimiter as the tolerance for simplification (smaller epsilon = more detailed)
+            epsilon = 0.001 * cv2.arcLength(cnt, True) # Use 0.1% of the contour perimiter as the tolerance for simplification (smaller epsilon = more detailed)
             poly = cv2.approxPolyDP(cnt, epsilon, True) # Uses the Ramer–Douglas–Peucker algorithm to produce a polygon with fewer vertices while approximating the original shape
 
             # Convert polygon format for output
