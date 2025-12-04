@@ -76,8 +76,6 @@ def avoid_obstacle(thym: Thymio, avoid_right: bool,  stage=0, pos_at_obst=[], an
             - angle_at_obst: Updated angle marker
     """
     ir_sens = thym.ir_sensors
-    last_angle = thym.last_orient
-    print(f"stage: {stage}, IR: {ir_sens}")
     
     if(avoid_right):
         # Avoid RIGHT: keep obstacle on LEFT (sensor 0)
@@ -85,7 +83,6 @@ def avoid_obstacle(thym: Thymio, avoid_right: bool,  stage=0, pos_at_obst=[], an
             case 0:
                 if(sum(ir_sens)>0):
                     thym.set_motor_speeds([ROT_SPEED, -ROT_SPEED])
-                    print(f"IR left: {ir_sens[0]}")
                 else:
                     pos_at_obst = thym.pos.copy()
                     stage=1
@@ -113,7 +110,6 @@ def avoid_obstacle(thym: Thymio, avoid_right: bool,  stage=0, pos_at_obst=[], an
             case 0:
                 if(sum(ir_sens)>0):
                     thym.set_motor_speeds([-ROT_SPEED, ROT_SPEED])
-                    print(f"IR right: {ir_sens[4]}")
                 else:
                     pos_at_obst = thym.pos.copy()
                     stage=1
