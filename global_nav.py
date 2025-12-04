@@ -141,7 +141,7 @@ def display_grid(map_grid, start=None, goal=None):
 
 
 # ============================================================
-#  GRID EXPANSION using cv2 dilation (for expanded_dijkstra)
+#  GRID EXPANSION using cv2 dilation
 # ============================================================
 
 def expand_grid_by_robot(grid, robot_size_cells):
@@ -372,116 +372,6 @@ def simplify_path(full_path):
 # ============================================================
 #  EXECUTION 
 # ============================================================
-
-# ============================================================
-#  PLOT PATH WITH ROBOT TRAJECTORY
-# ============================================================
-# def plot_path_with_trajectory(grid, path, robot_positions, start, goal, fig=None, ax=None):
-#     """
-#     Plots the planned path and the actual trajectory of the robot.
-#     Updates the same plot instead of creating a new one.
-    
-#     Args:
-#         grid: occupancy grid (0=free, -1=obstacle)
-#         path: planned path as list of (row, col) waypoints
-#         robot_positions: list of (x_cm, y_cm) actual robot positions
-#         start: (row, col) start position in grid
-#         goal: (row, col) goal position in grid
-#         fig: matplotlib figure to update (optional)
-#         ax: matplotlib axes to update (optional)
-    
-#     Returns:
-#         fig, ax: the updated figure and axes
-#     """
-#     # Define colors for the grid (show obstacles in red)
-#     cmap = ListedColormap(['white', 'black', 'blue', 'green', 'red', 'orange'])
-#     map_display = np.zeros_like(grid, dtype=int)
-
-#     # Initialize all as white
-#     map_display[:] = 0
-    
-#     # Mark obstacles in RED (index 4)
-#     obstacle_mask = (grid == -1)
-#     map_display[obstacle_mask] = 4  # Red for obstacles
-
-#     # Don't mark path cells in the grid - we'll draw lines instead
-    
-#     map_numeric_display = map_display
-
-#     # Create or clear the axes
-#     if ax is None:
-#         fig, ax = plt.subplots(figsize=(8, 8))
-#     else:
-#         ax.clear()
-    
-#     ax.imshow(map_numeric_display, cmap=cmap)
-
-#     # Set tick positions
-#     x_positions = np.arange(0, 201, 20)
-#     y_positions = np.arange(0, 201, 20)
-#     x_labels = [int(utils.cell_to_cm(col)) for col in x_positions]
-#     y_labels = [int(utils.arena_height_cm - utils.cell_to_cm(row)) for row in y_positions]
-
-#     ax.set_xticks(x_positions)
-#     ax.set_xticklabels(x_labels)
-#     ax.set_yticks(y_positions)
-#     ax.set_yticklabels(y_labels)
-#     ax.set_xlabel('X Dimension (cm)')
-#     ax.set_ylabel('Y Dimension (cm)')
-    
-#     # Grid lines
-#     ax.set_xticks(np.arange(-0.5, grid.shape[1], 1), minor=True)
-#     ax.set_yticks(np.arange(-0.5, grid.shape[0], 1), minor=True)
-#     ax.grid(which='minor', color='gray', linestyle='-', linewidth=0.15)
-#     ax.set_title("Path Planning with Robot Trajectory")
-
-#     # Start and Goal
-#     ax.scatter(start[1], start[0], s=300, c="blue", label="Start", zorder=6)
-#     ax.scatter(goal[1], goal[0], s=300, c="green", label="Goal", zorder=6)
-    
-#     # Plot planned path as connected line
-#     if path and len(path) > 0:
-#         path_cols = [p[1] for p in path]  # Column (X)
-#         path_rows = [p[0] for p in path]  # Row (Y)
-        
-#         ax.plot(
-#             path_cols,
-#             path_rows,
-#             '-',                # Line style
-#             color='blue',       # Color of the path
-#             linewidth=1,        # Line width
-#             alpha=0.6,          # Transparency
-#             label='Planned Path',
-#             zorder=3            # Under trajectory
-#         )
-    
-#     # Plot actual robot trajectory (in cm, convert to grid coordinates for display)
-#     if robot_positions and len(robot_positions) > 0:
-#         # Convert real cm positions to continuous grid coordinates (not discrete cells)
-#         trajectory_cols = [pos[0] / utils.cell_size_cm for pos in robot_positions]  # X in cm -> continuous col
-#         trajectory_rows = [utils.GRID_DIM - (pos[1] / utils.cell_size_cm) for pos in robot_positions]  # Y in cm -> continuous row (inverted)
-        
-#         ax.plot(
-#             trajectory_cols,
-#             trajectory_rows,
-#             '-',                # Line style
-#             color='orange',     # Color of the trajectory
-#             linewidth=1,        # Line width
-#             label='Robot Trajectory',
-#             zorder=4            # Ensure line is on top
-#         )
-        
-#         # Mark current position with a larger dot
-#         if len(trajectory_cols) > 0:
-#             ax.scatter(trajectory_cols[-1], trajectory_rows[-1], s=200, c="orange", 
-#                       edgecolors='black', linewidths=2, zorder=5, label="Current Position")
-    
-#     ax.legend()
-#     plt.draw()
-#     plt.pause(0.001)  # Small pause to update the plot
-    
-#     return fig, ax
-
 
 def find_path(mode, grid, start, goal):
     """
