@@ -51,6 +51,9 @@ class Vision:
         self.getEnvironment()
 
     def getEnvironment(self):
+        """
+        Locates and visualises all features in the environment (arena, start pose, goal, global obstacles) and creates a grid to store this information in. 
+        """
         # Capture a single frame from webcam - VideoCapture(1) opens camera device 1 on your computer
         # Use DirectShow backend on Windows for faster initialization (cv2.CAP_DSHOW)
         self.cap = cv2.VideoCapture(1, cv2.CAP_DSHOW) # 1 for Arthur, 0 for Chelsea and Eleo
@@ -182,9 +185,11 @@ class Vision:
         self.grid = occupancy_grid
 
     def getGrid(self):
+        """Returns the occupancy grid created during initialization"""
         return self.grid
 
     def getCellSizeCm(self):
+        """Returns the cell size of the occupancy grid created during initialization in cm"""
         return self.cell_size_cm
 
     def getInitialRobotPose(self):
@@ -200,7 +205,7 @@ class Vision:
         Returns:
             - the goal position detected during initialization in real world coordinates: ((X, Y) in meters)
             - the goal position in camera coordinates
-            - the corners of the goal aruco markers in camera coordinates
+            - the corners of the goal ArUco marker in camera coordinates
         """
         return self.goal_pos, self.goal_cam_pos, self.goal_marker_corners
 
@@ -256,14 +261,14 @@ class Vision:
 
     def getArenaCornerPixelsAndRealArenaSize(self, image):
         """
-        Detects ArUco markers:
-            ID 1 = Bottom-left (BL)
-            ID 2 = Top-right (TR)
+        Detects the two arena ArUco markers in image:
+            ID 1 = Bottom-left (BL) marker
+            ID 2 = Top-right (TR) marker
 
         Returns:
-            pixel_corners = [BL, BR, TR, TL]
-            arena_width_m
-            arena_height_m
+            pixel_corners : pixel corners in form [BL, BR, TR, TL]
+            arena_width_m : arena width in world frame (m)
+            arena_height_m : arena height in world frame (m)
         """
 
         # Dictionary for aruco markers
@@ -276,28 +281,28 @@ class Vision:
 
         if ids is None:
             print("No ArUco markers detected")
-            return None, None, None, None
+            return None, None, None
 
         ids = ids.flatten()
 
         # Must detect both markers
         if not (1 in ids and 2 in ids):
-            print(f"Missing arena markers: found {ids}, expected IDs 1 and 2")
-            return None, None, None, None
+            print(f"Missing arena markers: found ID {ids}, expected IDs 1 and 2")
+            return None, None, None
 
         # Find pixel centers of markers
-        idx_bl = list(ids).index(1)
-        idx_tr = list(ids).index(2)
+        idx_bl = list(ids).index(1) # Bottom left arena marker
+        idx_tr = list(ids).index(2) # Top right arena marker
 
         corners_bl = corners[idx_bl][0]  # 4 corner points (TL,TR,BR,BL)
         corners_tr = corners[idx_tr][0]
 
         # Pixel center of BL marker
-        bl_px = (int(corners_bl[:,0].mean()), int(corners_bl[:,1].mean()))
+        bl_px = (int(corners_bl[:,0].mean()), int(corners_bl[:,1].mean())) # Mean x points of all rows and mean y points of the all rows of the corners
         # Pixel center of TR marker
         tr_px = (int(corners_tr[:,0].mean()), int(corners_tr[:,1].mean()))
 
-        # Build rectangle:
+        # Build rectangular arena in pixels:
         x1, y1 = bl_px
         x2, y2 = tr_px
         br_px = (x2, y1)
@@ -307,8 +312,7 @@ class Vision:
 
         # Compute meters per pixel
 
-        # Marker width in pixels (use top-left -> top-right edge)
-        # For BL marker (ID 1)
+        # Use BL marker (ID 1) to find the marker width in pixels (use top-left to top-right edge)
         bl_marker_width_px = np.linalg.norm(corners_bl[1] - corners_bl[0])  # TR - TL
 
         if bl_marker_width_px < 1:
@@ -327,6 +331,16 @@ class Vision:
         return pixel_corners, arena_width_m, arena_height_m
     
     def findGoalPos(self, image):
+        """
+        Detects the goal ArUco marker in image:
+            ID 3
+
+        Returns:
+            (X, Y) : position of goal in world frame (m)
+            (goal_cam_x, goal_cam_y) : position of goal in camera frame (pixels)
+            goal_marker_corners : pixel corners of the ArUco marker in form [BL, BR, TR, TL]
+        """
+
         # Get goal position in camera frame
         goal_cam_x, goal_cam_y, goal_marker_corners = self.getGoalPosCameraFrame(image)
 
@@ -341,6 +355,14 @@ class Vision:
 
     
     def getRobotPose(self, image):
+        """
+        Detects the robot ArUco marker in image:
+            ID 0
+
+        Returns:
+            [X, Y] : position of robot in world frame (m)
+            robot_heading_angle: angle that the front of the robot makes with the horizontal in rads. In range (-pi, pi]
+        """
         # Get robot pose in camera frame
         robot_cam_x, robot_cam_y, robot_heading_angle, robot_marker_corners = self.getRobotPoseCameraFrame(image)
 
@@ -354,9 +376,13 @@ class Vision:
         return [X, Y], robot_heading_angle
     
     def getRobotPoseAndVisualise(self, image, vis):
-        """ 
-        Finds the robot pose in the image that is passed into the function, converts it into real world coordinates, and visualises
-        it on the vis instance that is also passed into the function. 
+        """
+        Detects the robot ArUco marker in image and visualises its position and heading direction on the vis instance:
+            ID 0
+
+        Returns:
+            [X, Y] : position of robot in world frame (m)
+            robot_heading_angle: angle that the front of the robot makes with the horizontal in rads. In range (-pi, pi]
         """
         # Get robot pose in camera frame
         robot_cam_x, robot_cam_y, robot_heading_angle, robot_marker_corners = self.getRobotPoseCameraFrame(image)
@@ -376,12 +402,12 @@ class Vision:
         
     def getRobotPoseCameraFrame(self, image):
         """
-        Detects only ArUco marker with ID 0.
+        Detects the robot ArUco marker (ID 0) in the image and returns its pose in the camera frame.
 
         Returns:
-        - center pixel (cx, cy)
-        - heading angle in radians
-        - 4 corner points in order (TL, TR, BR, BL)
+            cx, cy : center pixel of marker
+            heading_angle : heading angle in radians
+            robotCorners : 4 corner points in order (TL, TR, BR, BL)
         """
 
         # Dictionary for aruco markers
@@ -397,22 +423,22 @@ class Vision:
             return None, None, None, None
 
         # Convert ids to a simple list - instead of something like array([2], [1], [0]), it gives [2, 1, 0]
-        ids = ids.flatten()
+        ids = ids.flatten()        
 
         # Check if ID 0 exists
         if 0 not in ids:
             return None, None, None, None
 
         # Find index of ID 0 - in [2, 1, 0], index would be 2
-        idx = list(ids).index(0)
+        idx = list(ids).index(0) # Convert to list so that you can call .index(0) - list(ids) in form [np.int32(2), np.int32(1), np.int32(0)]
 
         # Get its corners
-        robotCorners = corners[idx][0]  # corners looks something like [array([[[x1,y1], [x2,y2], [x3,y3], [x4,y4]]]), array([[[x1,y1], [x2,y2], [x3,y3], [x4,y4]]]), ...]) so need [0] to get the actual corners for ID 0
+        robotCorners = corners[idx][0]  # corners looks something like [array([[[x1,y1], [x2,y2], [x3,y3], [x4,y4]]]), array([[[x1,y1], [x2,y2], [x3,y3], [x4,y4]]]), ...]) so need [0] to get the actual corners at the idx (ID 0)
         tl, tr, br, bl = robotCorners
 
         # Find center pixel of the marker
-        cx = int(robotCorners[:, 0].mean()) # Average all x values
-        cy = int(robotCorners[:, 1].mean()) # Average all y values 
+        cx = int(robotCorners[:, 0].mean()) # Average of x values in all rows
+        cy = int(robotCorners[:, 1].mean()) # Average of y values in all rows
 
         # Heading direction vector (TR - TL)
         dir_vec = tr - tl
@@ -422,10 +448,11 @@ class Vision:
     
     def getGoalPosCameraFrame(self, image):
         """
-        Detects ONLY ArUco marker with ID 3.
+        Detects the goal ArUco marker (ID 3) in the image and returns the position in camera frame.
+
         Returns:
-        - center pixel (cx, cy)
-        - 4 corner points (TL, TR, BR, BL)
+            cx, cy: center pixel of marker
+            goalCorners: 4 corner points of marker (TL, TR, BR, BL)
         """
         # Goal Aruco ID
         goalId = 3
@@ -453,7 +480,7 @@ class Vision:
         idx = list(ids).index(goalId)
 
         # Get its corners
-        goalCorners = corners[idx][0]  # shape (4,2)
+        goalCorners = corners[idx][0]
 
         # Find center pixel of the marker
         cx = int(goalCorners[:, 0].mean())
@@ -463,13 +490,26 @@ class Vision:
 
     def computeHomography(self, arena_corners_pixels, arena_width_m, arena_height_m):
         """
-        arena_corners_pixels: list of 4 (u,v) pixel points in the order:
-            bottom-left, bottom-right, top-right, top-left
-        arena_width_m: real arena width in meters
-        arena_height_m: real arena height in meters
+        Computes the 2D homography matrix H that maps pixel coordinates (u, v)
+        to real-world coordinates (X, Y) in meters.
+
+        The transformation is a planar projective transform (2D homography),
+        represented by a 3x3 matrix H. Points are converted using homogeneous 
+        coordinates:
+            [X']   [h11 h12 h13]   [u]
+            [Y'] = [h21 h22 h23] * [v]
+            [W']   [h31 h32 h33]   [1]
+
+        Then the true real-world coordinates are obtained by dividing by W':
+            X = X' / W'
+            Y = Y' / W'
+
+        Returns:
+            H : the homography matrix that maps pixel coordinates to world coordinates.
         """
 
-        # Real-world coordinates of the arena corners (meters)
+        # Real-world coordinates of the arena corners (meters), defining the
+        # world coordinate system. Bottom-left = (0,0), top-right = (width,height).
         world_corners = np.array([
             [0, 0],                          # Bottom-left
             [arena_width_m, 0],              # Bottom-right
@@ -477,21 +517,40 @@ class Vision:
             [0, arena_height_m]              # Top-left
         ], dtype=float)
 
-        img_pts = np.array(arena_corners_pixels, dtype=float)
-        world_pts = world_corners.reshape(-1, 1, 2)
+        # Convert inputs to the shape expected by cv2.findHomography
+        img_pts = np.array(arena_corners_pixels, dtype=float) # shape: (4, 2)
+        world_pts = world_corners.reshape(-1, 1, 2) # shape: (4, 1, 2)
 
+        # --- 2D Homography Calculation ---
+        # cv2.findHomography computes the 3×3 matrix H that best satisfies:
+        #
+        #   [X, Y, 1]^T  =  H * [u, v, 1]^T
+        #
+        # This is a planar projective transformation (2D homography),
+        # requiring homogeneous coordinates (the extra "1").
         H, _ = cv2.findHomography(img_pts, world_pts)
+
         return H
 
 
     def pixelToGlobal(self, H, pixel_point):
         """
         Convert a pixel point (u,v) into global (X,Y) using homography H.
+
+        Returns:
+            X, Y: position of point in global frame
         """
         u, v = pixel_point
         pt = np.array([u, v, 1.0])
         world = H @ pt
-        world /= world[2]  # Normalize
+
+        # Recall that:
+        #    [X']   [h11 h12 h13]   [u]
+        #    [Y'] = [h21 h22 h23] * [v]
+        #    [W']   [h31 h32 h33]   [1]
+        #
+        # So, since homography uses homogeneous coordinates which are scale invariant, we must divide X' and Y' by W' to get actual world coordinates
+        world /= world[2]  
 
         X = float(world[0])
         Y = float(world[1])
@@ -500,8 +559,10 @@ class Vision:
     
     def globalToPixel(self, H, global_point):
         """
-        Convert a global (X, Y) location into camera pixel coordinates (u, v)
-        using the inverse homography H.
+        Convert a global point (X, Y) into camera pixel coordinates (u, v) using the inverse of homography H.
+
+        Returns:
+            u, v: position of point in camera frame
         """
         X, Y = global_point
 
@@ -518,17 +579,31 @@ class Vision:
         return u, v
 
     def cameraToGlobal(self, marker_cam_x, marker_cam_y):
+        """
+        Convert a pixel point (u,v) into global coordinates (X,Y).
+
+        Returns:
+            X, Y: position of point in global frame
+        """
         H = self.computeHomography(self.arena_corners_pixels, self.arena_width_m, self.arena_height_m)
         return self.pixelToGlobal(H, (marker_cam_x, marker_cam_y))
     
     def globalToCamera(self, gloabl_x, global_y):
+        """
+        Convert a global point (X, Y) into camera pixel coordinates (u, v).
+
+        Returns:
+            u, v: position of point in camera frame
+        """
         H = self.computeHomography(self.arena_corners_pixels, self.arena_width_m, self.arena_height_m)
         return self.globalToPixel(H, (gloabl_x, global_y))
     
     def convertPolygonsToWorld(self, polygons):
         """
         Convert a list of pixel-based polygons into world coordinates.
-        Returns a list of polygons in meters.
+
+        Returns:
+            world_polygons: a list of polygons who's vertices are in world coordinates (meters).
         """
         # Compute homography
         H = self.computeHomography(self.arena_corners_pixels, self.arena_width_m, self.arena_height_m)
@@ -550,15 +625,16 @@ class Vision:
 
     def locateObstaclesRed(self, image):
         """
-        Detect red blobs in an image, approximate their shapes as polygons,
-        and return a list of polygons (each polygon is a list of (x,y) points).
-        Handles both HSV red regions (0–10° and 170–180°).
+        Detects red blobs in an image, and approximates their shapes as polygons.
+
+        Returns:
+            polygons: a list of polygons in the camera frame (each polygon is a list of (u,v) points).
         """
 
         # Convert to HSV
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-        # --- Red spans the start and end of the hue circle ---
+        # Red spans the start and end of the hue circle so need 2 upper and lower bounds
         lower_red1 = np.array([0, 70, 50])
         upper_red1 = np.array([10, 255, 255])
 
@@ -582,12 +658,12 @@ class Vision:
 
         for cnt in contours:
             # Filter out small artifacts
-            if cv2.contourArea(cnt) < 100:
+            if cv2.contourArea(cnt) < 100: # Computes area enclosed by the contours in pixels - rejects anything less than 100 pixels to eliminate small noise
                 continue
 
             # Approximate to polygon
-            epsilon = 0.001 * cv2.arcLength(cnt, True)
-            poly = cv2.approxPolyDP(cnt, epsilon, True)
+            epsilon = 0.001 * cv2.arcLength(cnt, True) # Use 0.1% of the contour perimiter as the tolerance for simplification (smaller epsilon = more detailed)
+            poly = cv2.approxPolyDP(cnt, epsilon, True) # Uses the Ramer–Douglas–Peucker algorithm to produce a polygon with fewer vertices while approximating the original shape
 
             # Convert polygon format for output
             polygon_points = [(int(p[0][0]), int(p[0][1])) for p in poly]
@@ -596,6 +672,9 @@ class Vision:
         return polygons
 
     def visualiseArena(self, vis, arena_corners_pixels):
+        """
+        Draws the corners of the arena onto the vis frame.
+        """
         # Draw arena outline (green polygon)
         pts = np.array(arena_corners_pixels, dtype=np.int32)
         cv2.polylines(vis, [pts], isClosed=True, color=(0, 255, 0), thickness=3)
@@ -607,6 +686,9 @@ class Vision:
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
     
     def visualiseRobotPose(self, vis, robot_marker_corners, robot_center_cam_x, robot_center_cam_y, robot_heading_angle, robot_center_world_x, robot_center_world_y):
+        """
+        Draws the pose of the robot onto the vis frame, including a marker bounding box, the robot’s center position, and the robot's heading direction as an arrow.
+        """
          # Draw ArUco marker location
         int_corners = robot_marker_corners.astype(np.int32)
         cv2.polylines(vis, [int_corners], True, (255, 0, 0), 3)
@@ -641,6 +723,9 @@ class Vision:
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
         
     def visualiseGoalPos(self, vis, goal_marker_corners, goal_center_cam_x, goal_center_cam_y, goal_center_world_x, goal_center_world_y):
+        """
+        Draws a bounding box around the goal marker and highlight's the center position in the vis frame
+        """
          # Draw ArUco marker location
         int_corners = goal_marker_corners.astype(np.int32)
         cv2.polylines(vis, [int_corners], True, (255, 0, 0), 3)
@@ -655,12 +740,18 @@ class Vision:
 
 
     def visualiseObstacles(self, vis, polygons):
+        """
+        Draws each obstacle polygon in the vis frame.
+        """
         # Outline obstacles
         for poly in polygons:
             pts = np.array(poly, dtype=np.int32)
             cv2.polylines(vis, [pts], isClosed=True, color=(0, 0, 255), thickness=2)
 
     def visualiseGlobalPoint(self, vis, point_x, point_y, colour=(0, 255, 0)): # BGR format - green colour at default
+        """
+        Draws a point in the world frame (x, y) in meters onto the vis image.
+        """
         # Convert global position to camera pixels
         camera_x, camera_y = self.globalToCamera(point_x, point_y)
 
@@ -672,39 +763,55 @@ class Vision:
         # Draw the point on the image
         cv2.circle(vis, (int(camera_x), int(camera_y)), 2, colour, -1)
 
-    def visualiseGlobalPath(self, vis, path_waypoints, colour=(0, 255, 0)):
+    def visualiseGlobalPath(self, vis, path_waypoints, colour=(0, 255, 0), max_points=200):
         """
-        Draw a global path onto the camera frame. Takes cm
+        Draw a path of global points onto the camera frame. Takes cm.
         
-        vis            : frame to draw on
-        path_waypoints : list of (x, y) global coordinates
-        colour         : BGR colour for points and lines
+        vis : frame to draw on
+        path_waypoints : list of (x, y) global coordinates in cm
+        colour : BGR colour for points and lines
+        max_points : max number of points to plot (down-samples if needed)
         """
 
         if not path_waypoints or len(path_waypoints) < 1:
             return
 
+        # Apply sampling if path is too long
+        total_pts = len(path_waypoints)
+
+        if total_pts > max_points:
+            step = total_pts / max_points
+            sampled = []
+
+            for i in range(max_points):
+                idx = int(i * step)
+                sampled.append(path_waypoints[idx])
+
+            # Ensure last point is exactly included
+            if sampled[-1] != path_waypoints[-1]:
+                sampled.append(path_waypoints[-1])
+
+            path_waypoints = sampled
+
+        # Convert sampled waypoints to pixel points
         pixel_points = []
 
-        # Convert all global waypoints to pixel coordinates
         for [x, y] in path_waypoints:
-            x, y = x/100, y/100
-            px, py = self.globalToCamera(x, y)
+            # convert cm to m
+            x, y = x / 100.0, y / 100.0
 
+            px, py = self.globalToCamera(x, y)
             if px is None or py is None:
-                continue  # skip invalid points
+                continue # skip invalid points
 
             pixel_points.append((int(px), int(py)))
 
             # Draw waypoint as a circle
             self.visualiseGlobalPoint(vis, x, y, colour)
 
-        # Draw lines between consecutive pixel points
+        # Draw the connecting path lines
         for i in range(len(pixel_points) - 1):
-            pt1 = pixel_points[i]
-            pt2 = pixel_points[i + 1]
-
-            cv2.line(vis, pt1, pt2, colour, 2)
+            cv2.line(vis, pixel_points[i], pixel_points[i + 1], colour, 2)
 
     def visualiseGlobalPoints(self, vis, points, colour=(0, 255, 0)):  # BGR format - green colour at default
         """
@@ -726,11 +833,10 @@ class Vision:
         
 
 
-
-
-
 if __name__ == "__main__":
-    # Usage demo
+    """
+    A demo usage of the vision class
+    """
     visionInstance = Vision()
     print("arena width and height : ", visionInstance.arena_width_m, visionInstance.arena_height_m)
 
@@ -751,11 +857,12 @@ if __name__ == "__main__":
     #     # --- Always redraw arena outline ---
     #     visionInstance.visualiseArena(vis, visionInstance.arena_corners_pixels)
 
-    #     # --- Always detect and draw robot pose ---
-    #     [X, Y], robot_heading_angle = visionInstance.getRobotPoseAndVisualise(frame, vis)
-    #     if (X is None or Y is None or robot_heading_angle is None):
-    #         continue
-    #     # print(f"X: {X:.5f}, Y: {Y:.5f}, Direction: {robot_heading_angle:.5f}")
+        # --- Always detect and draw robot pose ---
+        position, robot_heading_angle = visionInstance.getRobotPoseAndVisualise(frame, vis)
+        if (position is None or robot_heading_angle is None):
+            continue
+        [X, Y] = position
+        # print(f"X: {X:.5f}, Y: {Y:.5f}, Direction: {robot_heading_angle:.5f}")
 
     #     path = [[X*100, Y*100], [40, 40], [50, 60], [70, 70]]
     #     visionInstance.visualiseGlobalPath(vis, path)
