@@ -7,14 +7,15 @@ MAX_MOTROR_SPEED = 500
 
 
 class Thymio :
+    # Default attributes shared by all instances
     ir_sensors = [0, 0, 0, 0, 0]
     motor_speeds = [0, 0]
     pos = [0, 0]
     orient = 0
-    nav_mode = "GLOBAL" # navigation mode: "GLOBAL" or "LOCAL"
+    nav_mode = "GLOBAL"     # navigation mode selected: "GLOBAL" or "LOCAL"
     FORWARD = 1
-    DELTA_T = 4  # seconds forward
-    SAMPLING = 0.1  # timer loop period
+    DELTA_T = 4             # forward-movement duration (s) for variance computation (filter)
+    SAMPLING = 0.1          # loop update period (s)
 
     # Button states
     button_forward = 0
@@ -23,6 +24,7 @@ class Thymio :
 
     # Constructor
     def __init__(self, pos_init, orient):
+        """Initialize Thymio object and local states"""
         self.client = ClientAsync()
         self.node = None
         self.pos = pos_init
@@ -35,7 +37,7 @@ class Thymio :
         self.state = 0
         self._forward_start_time = None
         self._timer_task = None
-        self.is_kidnapped = False  # Kidnapping state
+        self.is_kidnapped = False  # Kidnapping state 
 
         # Button states
         self.button_forward = 0
@@ -45,16 +47,19 @@ class Thymio :
     # Methods
 
     async def _connect_to_thymio_(self):
+        """Connect and lock the Thymio node"""
         self.node = await self.client.wait_for_node()
         print("Thymio connected")
         await self.node.lock()
 
     async def unlock(self):
+        """Unlock the Thymio node"""
         if self.node is not None:
             await self.node.unlock()
             print("Thymio unlocked")
 
     def set_motor_speeds(self, speeds):
+        """Set motor speeds with saturation limits"""
         self.node.flush()
         if(speeds[0]>MAX_MOTROR_SPEED):
             speeds[0]=MAX_MOTROR_SPEED
@@ -69,6 +74,7 @@ class Thymio :
 
 
     async def update_ir(self):
+        """Update horizontal IR proximity sensors"""
         self.node.flush()
         await self.node.wait_for_variables({"prox.horizontal"})
         if "prox.horizontal" in self.node:
@@ -76,16 +82,17 @@ class Thymio :
             self.ir_sensors = self.ir_sensors[0:5]
 
     def set_pos(self, new_pos, orient):
+        """Set the robot state (mostly used by vision/EKF)"""
         self.pos = new_pos
         self.orient = orient
-        # TODO : Update the position on the Thymio robot if necessary
     
     def stop(self):
+        """Stop both motors"""
         self.set_motor_speeds([0, 0])
 
 
-    async def update_buttons(self): # Read the current values of several buttons
-
+    async def update_buttons(self):
+        """Read forward, center and backward button states"""
         self.node.flush()
         await self.node.wait_for_variables({"button.forward", "button.center", "button.backward"})
 
@@ -117,7 +124,11 @@ class Thymio :
             self.button_backward = 0
 
     async def button_loop(self):
-        #"""Infinite loop reacting to the button values"""
+        """Reactive loop:
+            - Forward button starts timed motion
+            - Center button stops
+            - Backward button exits loop
+        """
         while True:
             await self.update_buttons()
 
